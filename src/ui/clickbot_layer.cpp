@@ -310,9 +310,6 @@ bool ClickSettingsLayer::setup() {
 	CCMenu* menu = CCMenu::create();
 	m_mainLayer->addChild(menu);
 
-	this->button = button;
-	this->clickbotLayer = clickbotLayer;
-
 	matjson::Value data = Mod::get()->getSavedValue<matjson::Value>(button);
 	settings = matjson::Serialize<ClickSetting>::from_json(data);
 	std::string filename = settings.path.filename().string();

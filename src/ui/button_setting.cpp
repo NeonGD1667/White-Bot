@@ -1,6 +1,5 @@
 #include "../includes.hpp"
 #include "record_layer.hpp"
-#include "../download/downgrade.hpp"
 
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/loader/Mod.hpp>
@@ -42,7 +41,10 @@ public:
 
 class MyButtonSettingNodeV3 : public SettingNodeV3 {
 protected:
-    bool init(std::shared_ptr<MyButtonSettingV3> setting, float width) {
+    bool init(
+        std::shared_ptr<MyButtonSettingV3> setting,
+        float width
+    ) {
         if (!SettingNodeV3::init(setting, width))
             return false;
 
@@ -54,12 +56,6 @@ protected:
         if (key == "button-setting") {
             sprite = CCSprite::createWithSpriteFrameName(
                 "GJ_playBtn2_001.png"
-            );
-        }
-        // Downgrade button
-        else if (key == "downgrade-button") {
-            sprite = CCSprite::createWithSpriteFrameName(
-                "GJ_downloadBtn_001.png"
             );
         }
         // Fallback for other custom buttons
@@ -74,11 +70,12 @@ protected:
 
         sprite->setScale(0.325f);
 
-        CCMenuItemSpriteExtra* btn = CCMenuItemSpriteExtra::create(
-            sprite,
-            this,
-            menu_selector(MyButtonSettingNodeV3::onButton)
-        );
+        CCMenuItemSpriteExtra* btn =
+            CCMenuItemSpriteExtra::create(
+                sprite,
+                this,
+                menu_selector(MyButtonSettingNodeV3::onButton)
+            );
 
         getButtonMenu()->addChildAtPosition(
             btn,
@@ -105,15 +102,14 @@ protected:
                 ->getChildren();
 
         if (FLAlertLayer* layer =
-                typeinfo_cast<FLAlertLayer*>(children->lastObject())) {
+                typeinfo_cast<FLAlertLayer*>(
+                    children->lastObject()
+                )) {
             layer->keyBackClicked();
         }
 
         if (key == "button-setting") {
             RecordLayer::openMenu();
-        }
-        else if (key == "downgrade-button") {
-            downgrade::open();
         }
     }
 

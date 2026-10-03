@@ -1,6 +1,12 @@
-# DLL Bot
+# White Bot
 
 A high-performance Geometry Dash replay bot developed by **Homeless Team**.
+
+> ⚠️ **Rebranding Notice**
+>
+> Starting with **DLL Bot v3.0.1 pre-release**, the project will be rebranded as **White Bot**.
+>
+> **v3.0.1** is the final pre-release under the DLL Bot name. Future releases will use the **White Bot** name and identity.
 
 [![Build Stupid Mod](https://github.com/NeonGD1667/DLL-Bot/actions/workflows/build.yml/badge.svg)](https://github.com/NeonGD1667/DLL-Bot/actions/workflows/build.yml)
 [![GitHub Release](https://img.shields.io/github/v/release/NeonGD1667/DLL-Bot?include_prereleases)](https://github.com/NeonGD1667/DLL-Bot/releases)
@@ -21,6 +27,16 @@ A high-performance Geometry Dash replay bot developed by **Homeless Team**.
 * ⚡ High Performance
 * 📊 Macro Index
 * 🔧 Practice & Gameplay Tools
+
+## Why "White Bot"?
+
+The name **White Bot** was chosen through an internal vote among the **Homeless Team Admins**.
+
+After discussing the future identity of DLL Bot, the Admin team voted on the new name, with **White Bot** being selected as the name for the project's next generation.
+
+**DLL Bot → White Bot**
+
+The original DLL Bot releases will remain part of the project's history, with **v3.0.1 pre-release** serving as the final release under the DLL Bot name.
 
 ## Credits
 

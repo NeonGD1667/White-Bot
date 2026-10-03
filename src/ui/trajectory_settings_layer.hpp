@@ -127,29 +127,39 @@ private:
     popup->show();
   }
 
-  void updateColor() {
+  void updateColor() override {
     if (!color1 || !color2)
-      return;
-    ShowTrajectory &t = ShowTrajectory::get();
+        return;
+
+    ShowTrajectory& t = ShowTrajectory::get();
+
     t.color1 = ccc4FFromccc3B(color1->getColor());
     t.color2 = ccc4FFromccc3B(color2->getColor());
     t.updateMergedColor();
 
-    Mod::get()->setSavedValue("trajectory_color1",
-                              ShowTrajectory::ccc3BFromccc4F(t.color1));
-    Mod::get()->setSavedValue("trajectory_color2",
-                              ShowTrajectory::ccc3BFromccc4F(t.color2));
-  }
+    Mod::get()->setSavedValue(
+        "trajectory_color1",
+        ShowTrajectory::ccc3BFromccc4F(t.color1)
+    );
 
-  void textChanged(CCTextInputNode *) override {
+    Mod::get()->setSavedValue(
+        "trajectory_color2",
+        ShowTrajectory::ccc3BFromccc4F(t.color2)
+    );
+}
+
+void textChanged(CCTextInputNode*) override {
     std::string str = input->getString();
     int length = geode::utils::numFromString<int>(str).unwrapOr(0);
 
     if (length > 2560 || length < 1 || str.empty())
-      return input->setString(
-          Mod::get()->getSavedValue<std::string>("trajectory_length").c_str());
+        return input->setString(
+            Mod::get()->getSavedValue<std::string>(
+                "trajectory_length"
+            ).c_str()
+        );
 
     ShowTrajectory::get().length = length;
     Mod::get()->setSavedValue("trajectory_length", str);
-  }
+   }
 };

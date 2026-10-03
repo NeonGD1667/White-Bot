@@ -593,22 +593,65 @@ public:
 } // namespace
 
 const std::vector<std::vector<RecordSetting>> settings{
-    {{"TPS Bypass:", "macro_tps_enabled", InputType::Tps, 0.4f},
-     {"Speedhack:", "macro_speedhack_enabled", InputType::Speedhack, 0.4f},
-     {"Speed. Audio:", "macro_audio_speedhack_enabled",
-      InputType::AudioSpeedhack, 0.4f},
-     {"Enable Noclip:", "macro_noclip", InputType::Settings, 0.325f,
-      menu_selector(NoclipSettingsLayer::open)},
-     {"Show Trajectory:", "macro_show_trajectory", InputType::Settings, 0.325f,
-      menu_selector(TrajectorySettingsLayer::open)},
-     {"Confirm on Exit:", "macro_confirm_on_exit", InputType::None}},
-    {{"Instant respawn:", "macro_instant_respawn", InputType::None},
-     {"No death effect:", "macro_no_death_effect", InputType::None},
-     {"Seed:", "macro_seed_enabled", InputType::Seed, 0.4f},
-     {"Speed Music Sync:", "macro_speedhack_audio", InputType::None},
-     {"Enable Layout Mode:", "macro_layout_mode", InputType::None},
-     {"Auto Swift Click:", "auto_swift_click_enabled", InputType::Settings,
-      0.3f, menu_selector(AutoSwiftClickSettingsLayer::open)}},
+    // Page 1 — Macro / Gameplay
+    {
+        {"TPS Bypass:", "macro_tps_enabled", InputType::Tps, 0.4f},
+        {"Speedhack:", "macro_speedhack_enabled", InputType::Speedhack, 0.4f},
+        {"Speed. Audio:", "macro_audio_speedhack_enabled",
+         InputType::AudioSpeedhack, 0.4f},
+        {"Enable Noclip:", "macro_noclip", InputType::Settings, 0.325f,
+         menu_selector(NoclipSettingsLayer::open)},
+        {"Show Trajectory:", "macro_show_trajectory", InputType::Settings, 0.325f,
+         menu_selector(TrajectorySettingsLayer::open)},
+        {"Confirm on Exit:", "macro_confirm_on_exit", InputType::None}
+    },
+
+    // Page 2 — Playback / Macro
+    {
+        {"Instant respawn:", "macro_instant_respawn", InputType::None},
+        {"No death effect:", "macro_no_death_effect", InputType::None},
+        {"Seed:", "macro_seed_enabled", InputType::Seed, 0.4f},
+        {"Speed Music Sync:", "macro_speedhack_audio", InputType::None},
+        {"Enable Layout Mode:", "macro_layout_mode", InputType::None},
+        {"Always Practice Fixes:", "macro_always_practice_fixes",
+         InputType::None}
+    },
+
+    // Page 3 — Input / Automation
+    {
+        {"Enable Clickbot:", "clickbot_enabled", InputType::Settings, 0.325f,
+         menu_selector(ClickbotLayer::open)},
+        {"Enable Autoclicker:", "autoclicker_enabled", InputType::Settings,
+         0.3f, menu_selector(AutoclickerLayer::open)},
+        {"Faketaps:", "faketaps", InputType::None},
+        {"Ignore inputs:", "macro_ignore_inputs", InputType::None},
+        {"Input Mirror:", "p2_input_mirror", InputType::Settings, 0.325f,
+         menu_selector(MirrorSettingsLayer::open)},
+        {"Auto Swift Click:", "auto_swift_click_enabled", InputType::Settings,
+         0.3f, menu_selector(AutoSwiftClickSettingsLayer::open)}
+    },
+
+    // Page 4 — Recording / Frame
+    {
+        {"Show Frame Label:", "macro_show_frame_label", InputType::None},
+        {"Enable Frame Stepper:", "macro_frame_stepper", InputType::None},
+        {"Ghost Playback:", "macro_show_ghost", InputType::None},
+        {"Path Finder:", "macro_pathfinder_enabled", InputType::Settings,
+         0.325f, menu_selector(PathFinderSettingsLayer::open)},
+        {"Respawn Time:", "respawn_time_enabled", InputType::Respawn},
+        {"Enable Auto Saving:", "macro_auto_save", InputType::Autosave}
+    },
+
+    // Page 5 — Game / Portal
+    {
+        {"Disable Shaders:", "disable_shaders", InputType::None},
+        {"Instant Mirror Portal:", "instant_mirror_portal", InputType::None},
+        {"No Mirror Portal:", "no_mirror_portal", InputType::None},
+        {"Auto Safe Mode:", "macro_auto_safe_mode", InputType::None},
+        {"Enable Blur:", "menu_enable_blur", InputType::None}
+    },
+
+    // Page 6 — UI
     {
 #ifdef GEODE_IS_WINDOWS
         {"Force cursor on open:", "menu_show_cursor", InputType::None},
@@ -623,31 +666,9 @@ const std::vector<std::vector<RecordSetting>> settings{
         {"Hide labels on render:", "render_hide_labels", InputType::None},
         {"Hide playing label:", "macro_hide_playing_label", InputType::None},
         {"Hide recording label:", "macro_hide_recording_label",
-         InputType::None}},
-    {
-        {"Enable Clickbot:", "clickbot_enabled", InputType::Settings, 0.325f,
-         menu_selector(ClickbotLayer::open)},
-        {"Enable Autoclicker:", "autoclicker_enabled", InputType::Settings,
-         0.3f, menu_selector(AutoclickerLayer::open)},
-        {"Always Practice Fixes:", "macro_always_practice_fixes",
-         InputType::None},
-        {"Ignore inputs:", "macro_ignore_inputs", InputType::None},
-        {"Show Frame Label:", "macro_show_frame_label", InputType::None},
-        {"Enable Frame Stepper:", "macro_frame_stepper", InputType::None}
-        // { "Auto Stop Playing:", "macro_auto_stop_playing", InputType::None }
-    },
-    {{"Respawn Time:", "respawn_time_enabled", InputType::Respawn},
-     {"Input Mirror:", "p2_input_mirror", InputType::Settings, 0.325f,
-      menu_selector(MirrorSettingsLayer::open)},
-     {"Disable Shaders:", "disable_shaders", InputType::None},
-     {"Instant Mirror Portal:", "instant_mirror_portal", InputType::None},
-     {"No Mirror Portal:", "no_mirror_portal", InputType::None},
-     {"Enable Auto Saving:", "macro_auto_save", InputType::Autosave}},
-    {{"Ghost Playback:", "macro_show_ghost", InputType::None},
-     {"Path Finder:", "macro_pathfinder_enabled", InputType::Settings, 0.325f,
-      menu_selector(PathFinderSettingsLayer::open)},
-     {"Enable Blur:", "menu_enable_blur", InputType::None},
-     {"Auto Safe Mode:", "macro_auto_safe_mode", InputType::None}}};
+         InputType::None}
+    }
+};
 
 class $modify(PauseLayer) {
   void customSetup() {
