@@ -5,14 +5,7 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "C:/Users/DELL/Documents/Geode/**",
-                "C:/Users/DELL/Documents/bindings/**",
-                "C:/Users/DELL/Documents/asp2/**",
-                "C:/Users/DELL/Documents/fmt/**",
-                "C:/Users/DELL/Documents/nontype_functional/**",
-                "C:/Users/DELL/Documents/result/**",
-                "C:/Users/DELL/Documents/json/**",
-                "C:/Users/DELL/Documents/gd-imgui-cocos/**",
-                "C:/Users/DELL/Documents/imgui/**"
+                "D:/CPMCache/**"
             ],
             "cppStandard": "c++23"
         }
