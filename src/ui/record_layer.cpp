@@ -1276,14 +1276,16 @@ void RecordLayer::toggleSetting(CCObject *obj) {
   if (id == "macro_auto_safe_mode" && !value)
     g.safeMode = false;
 
-  if (id == "menu_enable_blur") {
+ if (id == "menu_enable_blur") {
     if (value)
-      BlurAPI::addBlur(
-          static_cast<CCNode *>(this));
+        WhiteBot::Blur::addBlur(
+            static_cast<CCNode*>(this)
+        );
     else
-      BlurAPI::removeBlur(
-          static_cast<CCNode *>(this));
-  }
+        WhiteBot::Blur::removeBlur(
+            static_cast<CCNode*>(this)
+        );
+}
 
   if (id == "macro_pathfinder_enabled") {
     if (value)
@@ -1524,10 +1526,11 @@ bool RecordLayer::setup() {
 
   mod = g.mod;
 
-  if (mod->getSavedValue<bool>(
-          "menu_enable_blur", true)) {
-    BlurAPI::addBlur(this);
-  }
+ if (mod->getSavedValue<bool>(
+        "menu_enable_blur", true
+    )) {
+    WhiteBot::Blur::addBlur(this);
+}
 
   cocos2d::CCPoint offset =
       (CCDirector::sharedDirector()->getWinSize() -
