@@ -1445,7 +1445,7 @@ class $modify(WhiteBotBlurNode, CCNode)
 // Frame Size Hook
 // ====================================================================
 
-class $modify(WhiteBotBlurEGLView)
+class $modify(WhiteBotBlurEGLView, CCEGLView)
 {
     void setFrameSize(
         float width,
@@ -1477,7 +1477,7 @@ class $modify(WhiteBotBlurEGLView)
 // GameManager Hook
 // ====================================================================
 
-class $modify(WhiteBotBlurGameManager)
+class $modify(WhiteBotBlurGameManager, GameManager)
 {
     void reloadAllStep5()
     {
@@ -1494,7 +1494,7 @@ class $modify(WhiteBotBlurGameManager)
 // AppDelegate Hook
 // ====================================================================
 
-class $modify(WhiteBotBlurAppDelegate)
+class $modify(WhiteBotBlurAppDelegate, AppDelegate)
 {
     void applicationWillBecomeActive()
     {
