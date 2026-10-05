@@ -1441,12 +1441,12 @@ void RecordLayer::openKeybinds(CCObject *) {
   if (!layer)
     return showKeybindsWarning();
 
-  CCLayer *mainLayer =
+   *mainLayer =
       layer->getChildByType<CCLayer>(0);
 
   if (!mainLayer)
     return showKeybindsWarning();
-
+CCLayer
   CCNode *scrollLayer =
       mainLayer->getChildByID("ScrollLayer");
 
