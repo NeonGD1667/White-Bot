@@ -4,6 +4,7 @@
 #include <Geode/loader/Mod.hpp>
 #include <Geode/utils/web.hpp>
 
+#include <filesystem>
 #include <fstream>
 
 using namespace geode::prelude;
@@ -53,6 +54,65 @@ bool responseOK(int code) {
     return code >= 200 && code < 300;
 }
 
+/*
+ * Apply downloaded update
+ *
+ * White Bot.geode.tmp
+ *        ↓
+ * remove old White Bot.geode
+ *        ↓
+ * rename .tmp → .geode
+ */
+bool applyPendingUpdate() {
+    auto modPath = getModPath();
+    auto tempPath = getTempPath();
+
+    if (!std::filesystem::exists(tempPath))
+        return false;
+
+    std::error_code ec;
+
+    // Remove old .geode
+    if (std::filesystem::exists(modPath)) {
+        std::filesystem::remove(modPath, ec);
+
+        if (ec) {
+            log::error(
+                "Failed to remove old mod '{}': {}",
+                modPath.string(),
+                ec.message()
+            );
+
+            return false;
+        }
+    }
+
+    // Rename .geode.tmp → .geode
+    std::filesystem::rename(
+        tempPath,
+        modPath,
+        ec
+    );
+
+    if (ec) {
+        log::error(
+            "Failed to rename update '{}' -> '{}': {}",
+            tempPath.string(),
+            modPath.string(),
+            ec.message()
+        );
+
+        return false;
+    }
+
+    log::info(
+        "Successfully applied White Bot update: {}",
+        modPath.string()
+    );
+
+    return true;
+}
+
 } // namespace
 
 
@@ -63,6 +123,7 @@ bool responseOK(int code) {
 geode::async::TaskHolder<
     geode::utils::web::WebResponse
 > UpdaterClient::s_getHolder;
+
 
 void UpdaterClient::getLatestRelease(
     ReleaseCallback callback
@@ -107,6 +168,7 @@ void UpdaterClient::getLatestRelease(
         }
     );
 }
+
 
 void UpdaterClient::getLatestDownload(
     DownloadCallback callback
@@ -187,11 +249,13 @@ VersionManagerSettingV3::parse(
     );
 }
 
+
 bool VersionManagerSettingV3::load(
     matjson::Value const&
 ) {
     return true;
 }
+
 
 bool VersionManagerSettingV3::save(
     matjson::Value&
@@ -199,9 +263,11 @@ bool VersionManagerSettingV3::save(
     return true;
 }
 
+
 bool VersionManagerSettingV3::isDefaultValue() const {
     return true;
 }
+
 
 void VersionManagerSettingV3::reset() {}
 
@@ -223,6 +289,7 @@ VersionManagerSettingV3::createNode(
         width
     );
 }
+
 
 bool VersionManagerSettingNodeV3::init(
     std::shared_ptr<VersionManagerSettingV3> setting,
@@ -290,11 +357,13 @@ bool VersionManagerSettingNodeV3::init(
     return true;
 }
 
+
 void VersionManagerSettingNodeV3::updateState(
     CCNode* invoker
 ) {
     SettingNodeV3::updateState(invoker);
 }
+
 
 void VersionManagerSettingNodeV3::onCheckUpdate(
     CCObject*
@@ -312,6 +381,7 @@ void VersionManagerSettingNodeV3::onCheckUpdate(
                     "Update",
                     "Failed to check for updates."
                 );
+
                 return;
             }
 
@@ -326,6 +396,7 @@ void VersionManagerSettingNodeV3::onCheckUpdate(
                     "Update",
                     "White Bot is already up to date."
                 );
+
                 return;
             }
 
@@ -353,12 +424,13 @@ void VersionManagerSettingNodeV3::onCheckUpdate(
                             "Update",
                             "Failed to download update."
                         );
+
                         return;
                     }
 
                     showAlert(
                         "Update",
-                        "Update downloaded. Restart to apply."
+                        "Update downloaded. Restart the game to apply."
                     );
                 }
             );
@@ -366,15 +438,19 @@ void VersionManagerSettingNodeV3::onCheckUpdate(
     );
 }
 
+
 void VersionManagerSettingNodeV3::onDowngrade(
     CCObject*
 ) {
     showComingSoon("Downgrade");
 }
 
+
 void VersionManagerSettingNodeV3::onCommit() {}
 
+
 void VersionManagerSettingNodeV3::onResetToDefault() {}
+
 
 VersionManagerSettingNodeV3*
 VersionManagerSettingNodeV3::create(
@@ -397,15 +473,18 @@ VersionManagerSettingNodeV3::create(
     return nullptr;
 }
 
+
 bool VersionManagerSettingNodeV3::hasUncommittedChanges()
     const {
     return false;
 }
 
+
 bool VersionManagerSettingNodeV3::hasNonDefaultValue()
     const {
     return false;
 }
+
 
 std::shared_ptr<VersionManagerSettingV3>
 VersionManagerSettingNodeV3::getSetting() const {
@@ -421,9 +500,28 @@ VersionManagerSettingNodeV3::getSetting() const {
  * Register custom setting
  */
 
-$execute {
-    (void)Mod::get()->registerCustomSettingType(
-        "custom:version-manager",
-        &VersionManagerSettingV3::parse
-    );
+$on_mod(Loaded) {
+    /*
+     * Apply pending update first.
+     */
+    applyPendingUpdate();
+
+    /*
+     * Register custom setting.
+     *
+     * IMPORTANT:
+     * "custom:" is only used in mod.json.
+     */
+    auto result =
+        Mod::get()->registerCustomSettingType(
+            "version-manager",
+            &VersionManagerSettingV3::parse
+        );
+
+    if (!result) {
+        log::error(
+            "Failed to register custom setting 'version-manager': {}",
+            result.unwrapErr()
+        );
+    }
 }
