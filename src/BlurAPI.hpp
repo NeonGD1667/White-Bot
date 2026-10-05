@@ -94,7 +94,7 @@ namespace WhiteBot::Blur
         int passes = 3;
         float alphaThreshold = 0.01f;
 
-        bool init() override
+        bool init() 
         {
             return true;
         }
@@ -1120,7 +1120,7 @@ void main()
 // CCLayerColor Hook
 // ====================================================================
 
-class $modify(WhiteBotBlurLayerColor)
+class $modify(WhiteBotBlurLayerColor, CCLayerColor)
 {
     void draw()
     {
@@ -1160,7 +1160,7 @@ class $modify(WhiteBotBlurLayerColor)
 // CCNode Hook
 // ====================================================================
 
-class $modify(WhiteBotBlurNode)
+class $modify(WhiteBotBlurNode, CCNode)
 {
     void visit()
     {
