@@ -12,6 +12,7 @@
 #include <Geode/modify/CCEGLViewProtocol.hpp>
 #include <Geode/modify/GameManager.hpp>
 #include <Geode/modify/AppDelegate.hpp>
+#include <Geode/modify/CCEGLView.hpp>
 
 #ifndef GL_READ_FRAMEBUFFER
 #define GL_READ_FRAMEBUFFER 0x8CA8
