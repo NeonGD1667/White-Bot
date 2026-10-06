@@ -29,7 +29,8 @@
                 "mac",
                 "ios"
             ]
-        },
+        }
+    },
     "settings": {
         "button-setting": {
             "type": "custom:button",
