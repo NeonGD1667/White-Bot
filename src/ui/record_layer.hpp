@@ -1,4 +1,4 @@
-```cpp
+
 #pragma once
 #include "../includes.hpp"
 #include <Geode/ui/GeodeUI.hpp>
@@ -116,4 +116,4 @@ public:
   void updateTPS();
   void showKeybindsWarning();
 };
-```
+
