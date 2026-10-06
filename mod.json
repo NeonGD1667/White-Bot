@@ -7,13 +7,9 @@
         "ios": "2.2081"
     },
     "version": "v3.0.1",
-    "id": "homeless.dll-bot",
-    "name": "DLL Bot",
-    "developers": [
-        "Homeless Team",
-        "danhnt",
-        "chickendev1667"
-    ],
+    "id": "homeless.white-bot",
+    "name": "White Bot",
+    "developers": ["Homeless Team","danhnt","chickendev1667","daucatmoiVN","kisakoGD","ksounl"],
     "description": "Ultimate Bot for GD",
     "dependencies": {
         "eclipse.ffmpeg-api": {
@@ -34,17 +30,6 @@
                 "ios"
             ]
         },
-        "thesillydoggo.blur-api": {
-            "version": ">=1.0.0",
-            "required": true,
-            "platforms": [
-                "win",
-                "android",
-                "mac",
-                "ios"
-            ]
-        }
-    },
     "settings": {
         "button-setting": {
             "type": "custom:button",
