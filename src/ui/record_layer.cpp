@@ -1441,8 +1441,8 @@ void RecordLayer::openKeybinds(CCObject *) {
   if (!layer)
     return showKeybindsWarning();
 
-   *mainLayer =
-      layer->getChildByType<CCLayer>(0);
+   CCLayer* mainLayer =
+    layer->getChildByType<CCLayer>(0);
 
   if (!mainLayer)
     return showKeybindsWarning();
