@@ -22,572 +22,655 @@
 #include <Geode/modify/PauseLayer.hpp>
 #include <Geode/utils/async.hpp>
 #include <Geode/utils/web.hpp>
+#include <Geode/Geode.hpp>
 
 #include <algorithm>
 #include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <string>
+#include <vector>
+
 
 namespace {
 
 class MacroIndexPopup : public geode::Popup, public TextInputDelegate {
 private:
-  struct MacroEntry {
-    std::string levelName;
-    int levelId = 0;
-    std::string difficulty;
-    std::string uploader;
-    float rating = 0.f;
-    std::string format;
-    std::string downloadUrl;
-  };
-
-  CCTextInputNode *searchInput = nullptr;
-  CCTextInputNode *hostInput = nullptr;
-
-  CCLabelBMFont *statusLabel = nullptr;
-
-  CCMenuItemSpriteExtra *refreshBtn = nullptr;
-  CCMenuItemSpriteExtra *applyHostBtn = nullptr;
-
-  CCLayer *resultsLayer = nullptr;
-  CCMenu *resultsMenu = nullptr;
-
-  std::vector<MacroEntry> allEntries;
-  std::vector<MacroEntry> filteredEntries;
-  std::vector<CCNode *> resultNodes;
-
-  geode::async::TaskHolder<geode::utils::web::WebResponse> indexTask;
-  geode::async::TaskHolder<geode::utils::web::WebResponse> downloadTask;
-
-protected:
-  bool setup() {
-    this->setTitle("Macro Index");
-
-    auto mod = Mod::get();
-
-    //
-    // Search
-    //
-    searchInput =
-        CCTextInputNode::create(150, 30, "Search level...", "chatFont.fnt");
-
-    searchInput->setContentSize({205.f, 22.f});
-    searchInput->setPosition({-25.f, 105.f});
-    searchInput->setMaxLabelWidth(190.f);
-    searchInput->setMaxLabelScale(0.7f);
-    searchInput->setMouseEnabled(true);
-    searchInput->setTouchEnabled(true);
-    searchInput->setDelegate(this);
-
-    m_mainLayer->addChild(searchInput);
-
-    //
-    // Refresh
-    //
-    auto refreshSprite = ButtonSprite::create("Refresh");
-    refreshSprite->setScale(0.48f);
-
-    refreshBtn = CCMenuItemSpriteExtra::create(
-        refreshSprite, this, menu_selector(MacroIndexPopup::onRefresh));
-
-    refreshBtn->setPosition({145.f, 105.f});
-    m_mainLayer->addChild(refreshBtn);
-
-    //
-    // Host URL
-    //
-    hostInput =
-        CCTextInputNode::create(150, 30, "Index URL", "chatFont.fnt");
-
-    hostInput->setContentSize({270.f, 22.f});
-    hostInput->setPosition({-20.f, 70.f});
-    hostInput->setMaxLabelWidth(250.f);
-    hostInput->setMaxLabelScale(0.65f);
-    hostInput->setMouseEnabled(true);
-    hostInput->setTouchEnabled(true);
-    hostInput->setDelegate(this);
-
-    auto currentURL =
-        mod->getSettingValue<std::string>("macro_index_url");
-
-    hostInput->setString(currentURL.c_str());
-
-    m_mainLayer->addChild(hostInput);
-
-    //
-    // Apply host
-    //
-    auto applySprite = ButtonSprite::create("Apply");
-    applySprite->setScale(0.48f);
-
-    applyHostBtn = CCMenuItemSpriteExtra::create(
-        applySprite, this, menu_selector(MacroIndexPopup::onApplyHost));
-
-    applyHostBtn->setPosition({145.f, 70.f});
-    m_mainLayer->addChild(applyHostBtn);
-
-    //
-    // Status
-    //
-    statusLabel =
-        CCLabelBMFont::create("Loading...", "chatFont.fnt");
-
-    statusLabel->setPosition({0.f, 40.f});
-    statusLabel->setScale(0.42f);
-    statusLabel->setOpacity(180);
-    statusLabel->setAnchorPoint({0.5f, 0.5f});
-
-    m_mainLayer->addChild(statusLabel);
-
-    //
-    // Results
-    //
-    resultsLayer = CCLayer::create();
-    resultsLayer->setPosition({0.f, -120.f});
-    m_mainLayer->addChild(resultsLayer);
-
-    resultsMenu = CCMenu::create();
-    resultsMenu->setPosition({0.f, 0.f});
-    resultsLayer->addChild(resultsMenu);
-
-    fetchIndex();
-
-    return true;
-  }
-
-  void setStatus(std::string const &status) {
-    if (!statusLabel)
-      return;
-
-    statusLabel->setString(status.c_str());
-  }
-
-  static std::string toLower(std::string value) {
-    std::transform(
-        value.begin(), value.end(), value.begin(),
-        [](unsigned char c) {
-          return static_cast<char>(std::tolower(c));
-        });
-
-    return value;
-  }
-
-  static std::string sanitizeFilename(std::string name) {
-    static constexpr char invalidChars[] = {
-        '<', '>', ':', '"', '/', '\\', '|', '?', '*'
+    struct MacroEntry {
+        std::string levelName;
+        int levelId = 0;
+        std::string difficulty;
+        std::string uploader;
+        float rating = 0.f;
+        std::string format;
+        std::string downloadUrl;
     };
 
-    for (char &c : name) {
-      if (std::find(
-              std::begin(invalidChars),
-              std::end(invalidChars),
-              c) != std::end(invalidChars)) {
-        c = '_';
-      }
+    CCTextInputNode* searchInput = nullptr;
+    CCTextInputNode* hostInput = nullptr;
+    CCLabelBMFont* statusLabel = nullptr;
+
+    CCMenuItemSpriteExtra* refreshBtn = nullptr;
+    CCMenuItemSpriteExtra* applyHostBtn = nullptr;
+
+    CCLayer* resultsLayer = nullptr;
+    CCMenu* resultsMenu = nullptr;
+
+    std::vector<MacroEntry> allEntries;
+    std::vector<MacroEntry> filteredEntries;
+
+    geode::async::TaskHolder<geode::utils::web::WebResponse> indexTask;
+    geode::async::TaskHolder<geode::utils::web::WebResponse> downloadTask;
+
+    static std::string toLower(std::string value) {
+        std::transform(
+            value.begin(), value.end(), value.begin(),
+            [](unsigned char c) {
+                return static_cast<char>(std::tolower(c));
+            }
+        );
+
+        return value;
     }
 
-    while (!name.empty() &&
-           (name.back() == ' ' || name.back() == '.')) {
-      name.pop_back();
+    static std::string sanitizeFilename(std::string name) {
+        constexpr char invalid[] = "<>:\"/\\|?*";
+
+        for (char& c : name) {
+            if (std::find(
+                    std::begin(invalid),
+                    std::end(invalid) - 1,
+                    c
+                ) != std::end(invalid) - 1) {
+                c = '_';
+            }
+        }
+
+        while (!name.empty() &&
+               (name.back() == ' ' || name.back() == '.')) {
+            name.pop_back();
+        }
+
+        if (name.empty())
+            name = "macro";
+
+        return name;
     }
 
-    if (name.empty())
-      name = "macro";
+    static std::string getExtension(std::string format) {
+        format = toLower(format);
 
-    return name;
-  }
+        if (!format.empty() && format.front() == '.')
+            format.erase(format.begin());
 
-  void fetchIndex() {
-    if (!statusLabel)
-      return;
+        // Chỉ cho phép các định dạng macro đã hỗ trợ.
+        if (format == "gdr")
+            return ".gdr";
 
-    auto url =
-        Mod::get()->getSettingValue<std::string>("macro_index_url");
+        if (format == "gdr2")
+            return ".gdr2";
 
-    if (url.empty()) {
-      setStatus("Index URL is empty.");
-      return;
+        if (format == "json" || format == "gdr.json")
+            return ".gdr.json";
+
+        if (format == "xd")
+            return ".xd";
+
+        if (format == "slc2")
+            return ".slc2";
+
+        if (format == "slc3")
+            return ".slc3";
+
+        return ".gdr2";
     }
 
-    setStatus("Fetching index...");
-
-    indexTask.spawn(
-        geode::utils::web::WebRequest()
-            .userAgent("DLL-Bot Macro Index")
-            .get(url),
-        [this](geode::utils::web::WebResponse response) {
-          this->onIndexResult(std::move(response));
-        });
-  }
-
-  void onIndexResult(geode::utils::web::WebResponse response) {
-    if (!response.ok()) {
-      setStatus("Failed to fetch index.");
-      return;
+    void setStatus(std::string const& text) {
+        if (statusLabel)
+            statusLabel->setString(text.c_str());
     }
 
-    auto textResult = response.string();
-
-    if (!textResult) {
-      setStatus("Failed to read index.");
-      return;
-    }
-
-    std::string text = textResult.unwrapOr("");
-
-    if (text.empty()) {
-      setStatus("Index is empty.");
-      return;
-    }
-
-    try {
-      auto json = nlohmann::json::parse(text);
-
-      if (!json.is_array()) {
-        setStatus("Invalid index format.");
-        return;
-      }
-
-      allEntries.clear();
-
-      for (auto const &item : json) {
-        if (!item.is_object())
-          continue;
-
-        MacroEntry entry;
-
-        entry.levelName =
-            item.value("level_name", std::string());
-
-        entry.levelId =
-            item.value("level_id", 0);
-
-        entry.difficulty =
-            item.value("difficulty", std::string());
-
-        entry.uploader =
-            item.value("uploader", std::string());
-
-        entry.rating =
-            item.value("rating", 0.f);
-
-        entry.format =
-            item.value("format", std::string());
-
-        entry.downloadUrl =
-            item.value("download_url", std::string());
-
-        if (entry.downloadUrl.empty())
-          continue;
-
-        allEntries.push_back(std::move(entry));
-      }
-
-      applyFilter(
-          searchInput ? std::string(searchInput->getString()) : "");
-
-      setStatus(
-          fmt::format("{} macros", allEntries.size()));
-    }
-    catch (std::exception const &) {
-      setStatus("Invalid JSON index.");
-    }
-  }
-
-  void applyFilter(std::string const &query) {
-    filteredEntries.clear();
-
-    std::string lowerQuery = toLower(query);
-
-    for (auto const &entry : allEntries) {
-      if (lowerQuery.empty()) {
-        filteredEntries.push_back(entry);
-        continue;
-      }
-
-      std::string lowerName = toLower(entry.levelName);
-
-      if (lowerName.find(lowerQuery) != std::string::npos)
-        filteredEntries.push_back(entry);
-    }
-
-    populateResults();
-  }
-
-  void clearResults() {
-    if (!resultsMenu)
-      return;
-
-    resultsMenu->removeAllChildrenWithCleanup(true);
-    resultNodes.clear();
-  }
-
-  void populateResults() {
-    if (!resultsMenu)
-      return;
-
-    clearResults();
-
-    constexpr size_t MAX_RESULTS = 5;
-
-    size_t count =
-        std::min(MAX_RESULTS, filteredEntries.size());
-
-    if (count == 0) {
-      auto label =
-          CCLabelBMFont::create("No macros found.", "chatFont.fnt");
-
-      label->setScale(0.5f);
-      label->setOpacity(150);
-      label->setPosition({0.f, 0.f});
-
-      resultsMenu->addChild(label);
-      return;
-    }
-
-    for (size_t i = 0; i < count; i++) {
-      auto const &entry = filteredEntries[i];
-
-      float y = -static_cast<float>(i) * 31.f;
-
-      //
-      // Main level name
-      //
-      std::string name =
-          entry.levelName.empty()
-              ? "Unknown Level"
-              : entry.levelName;
-
-      if (name.size() > 25)
-        name = name.substr(0, 22) + "...";
-
-      auto nameLabel =
-          CCLabelBMFont::create(name.c_str(), "bigFont.fnt");
-
-      nameLabel->setAnchorPoint({0.f, 0.5f});
-      nameLabel->setPosition({-165.f, y + 7.f});
-      nameLabel->setScale(0.35f);
-
-      resultsMenu->addChild(nameLabel);
-      resultNodes.push_back(nameLabel);
-
-      //
-      // Info
-      //
-      std::string info =
-          fmt::format(
-              "ID: {}  |  {}  |  {}  |  {:.1f}",
-              entry.levelId,
-              entry.difficulty.empty()
-                  ? "Unknown"
-                  : entry.difficulty,
-              entry.uploader.empty()
-                  ? "Unknown"
-                  : entry.uploader,
-              entry.rating);
-
-      if (info.size() > 62)
-        info = info.substr(0, 59) + "...";
-
-      auto infoLabel =
-          CCLabelBMFont::create(info.c_str(), "chatFont.fnt");
-
-      infoLabel->setAnchorPoint({0.f, 0.5f});
-      infoLabel->setPosition({-165.f, y - 7.f});
-      infoLabel->setScale(0.27f);
-      infoLabel->setOpacity(150);
-
-      resultsMenu->addChild(infoLabel);
-      resultNodes.push_back(infoLabel);
-
-      //
-      // Download button
-      //
-      auto downloadSprite =
-          ButtonSprite::create("Download");
-
-      downloadSprite->setScale(0.42f);
-
-      auto downloadBtn = CCMenuItemSpriteExtra::create(
-          downloadSprite,
-          this,
-          menu_selector(MacroIndexPopup::onDownloadClicked));
-
-      downloadBtn->setTag(static_cast<int>(i));
-      downloadBtn->setPosition({143.f, y});
-
-      resultsMenu->addChild(downloadBtn);
-      resultNodes.push_back(downloadBtn);
-    }
-  }
-
-  void onDownloadClicked(CCObject *sender) {
-    auto button =
-        static_cast<CCMenuItemSpriteExtra *>(sender);
-
-    int index = button->getTag();
-
-    if (index < 0 ||
-        static_cast<size_t>(index) >= filteredEntries.size())
-      return;
-
-    MacroEntry entry = filteredEntries[index];
-
-    if (entry.downloadUrl.empty()) {
-      setStatus("Invalid download URL.");
-      return;
-    }
-
-    std::filesystem::path folder =
-        Mod::get()->getSettingValue<std::filesystem::path>(
-            "macros_folder");
-
-    try {
-      std::filesystem::create_directories(folder);
-    }
-    catch (...) {
-      setStatus("Failed to open macro folder.");
-      return;
-    }
-
-    std::string filename =
-        sanitizeFilename(entry.levelName);
-
-    std::string extension = entry.format;
-
-    if (!extension.empty() && extension.front() != '.')
-      extension = "." + extension;
-
-    if (extension.empty())
-      extension = ".gdr2";
-
-    std::filesystem::path output =
-        folder / (filename + extension);
-
-    int collision = 1;
-
-    while (std::filesystem::exists(output)) {
-      output =
-          folder /
-          fmt::format(
-              "{} ({}){}",
-              filename,
-              collision,
-              extension);
-
-      collision++;
-    }
-
-    setStatus(
-        fmt::format(
-            "Downloading {}...",
-            entry.levelName));
-
-    downloadTask.spawn(
-        geode::utils::web::WebRequest()
-            .userAgent("DLL-Bot Macro Index")
-            .get(entry.downloadUrl),
-        [this, output](geode::utils::web::WebResponse response) {
-          if (!response.ok()) {
-            setStatus("Download failed.");
+    void clearResults() {
+        if (!resultsMenu)
             return;
-          }
 
-          auto data = response.data();
-
-          try {
-            std::ofstream file(
-                output,
-                std::ios::binary);
-
-            if (!file.is_open()) {
-              setStatus("Failed to save macro.");
-              return;
-            }
-
-            file.write(
-                reinterpret_cast<const char *>(data.data()),
-                static_cast<std::streamsize>(data.size()));
-
-            file.close();
-
-            if (!file) {
-              setStatus("Failed to save macro.");
-              return;
-            }
-
-            setStatus("Macro downloaded.");
-
-            Notification::create(
-                "Macro Downloaded",
-                NotificationIcon::Success)
-                ->show();
-          }
-          catch (...) {
-            setStatus("Failed to save macro.");
-          }
-        });
-  }
-
-  void onRefresh(CCObject *) {
-    fetchIndex();
-  }
-
-  void onApplyHost(CCObject *) {
-    if (!hostInput)
-      return;
-
-    std::string url =
-        hostInput->getString();
-
-    if (url.empty()) {
-      setStatus("Index URL is empty.");
-      return;
+        resultsMenu->removeAllChildrenWithCleanup(true);
     }
 
-    Mod::get()->setSettingValue<std::string>(
-        "macro_index_url",
-        url);
+    // ========================================================
+    // UI
+    // ========================================================
 
-    setStatus("Index URL updated.");
+    bool setup() {
+        this->setTitle("Macro Index");
 
-    fetchIndex();
-  }
+        auto mod = Mod::get();
+
+        // Search input
+        searchInput = CCTextInputNode::create(
+            150, 30, "Search level...", "chatFont.fnt"
+        );
+
+        searchInput->setContentSize({205.f, 22.f});
+        searchInput->setPosition({-25.f, 94.f});
+        searchInput->setMaxLabelWidth(190.f);
+        searchInput->setMaxLabelScale(0.7f);
+        searchInput->setMouseEnabled(true);
+        searchInput->setTouchEnabled(true);
+        searchInput->setDelegate(this);
+
+        m_mainLayer->addChild(searchInput);
+
+        // Refresh button
+        auto refreshSprite = ButtonSprite::create("Refresh");
+        refreshSprite->setScale(0.48f);
+
+        refreshBtn = CCMenuItemSpriteExtra::create(
+            refreshSprite,
+            this,
+            menu_selector(MacroIndexPopup::onRefresh)
+        );
+
+        refreshBtn->setPosition({145.f, 94.f});
+        m_mainLayer->addChild(refreshBtn);
+
+        // Index URL input
+        hostInput = CCTextInputNode::create(
+            150, 30, "Index URL", "chatFont.fnt"
+        );
+
+        hostInput->setContentSize({245.f, 22.f});
+        hostInput->setPosition({-20.f, 61.f});
+        hostInput->setMaxLabelWidth(225.f);
+        hostInput->setMaxLabelScale(0.65f);
+        hostInput->setMouseEnabled(true);
+        hostInput->setTouchEnabled(true);
+        hostInput->setDelegate(this);
+
+        auto currentURL =
+            mod->getSettingValue<std::string>("macro_index_url");
+
+        hostInput->setString(currentURL.c_str());
+        m_mainLayer->addChild(hostInput);
+
+        // Apply button
+        auto applySprite = ButtonSprite::create("Apply");
+        applySprite->setScale(0.48f);
+
+        applyHostBtn = CCMenuItemSpriteExtra::create(
+            applySprite,
+            this,
+            menu_selector(MacroIndexPopup::onApplyHost)
+        );
+
+        applyHostBtn->setPosition({145.f, 61.f});
+        m_mainLayer->addChild(applyHostBtn);
+
+        // Status
+        statusLabel = CCLabelBMFont::create(
+            "Loading index...", "chatFont.fnt"
+        );
+
+        statusLabel->setPosition({0.f, 31.f});
+        statusLabel->setScale(0.42f);
+        statusLabel->setOpacity(180);
+
+        m_mainLayer->addChild(statusLabel);
+
+        // Results area
+        resultsLayer = CCLayer::create();
+        resultsLayer->setPosition({0.f, -45.f});
+        m_mainLayer->addChild(resultsLayer);
+
+        resultsMenu = CCMenu::create();
+        resultsMenu->setPosition({0.f, 0.f});
+        resultsLayer->addChild(resultsMenu);
+
+        fetchIndex();
+
+        return true;
+    }
+
+    // ========================================================
+    // Fetch index
+    // ========================================================
+
+    void fetchIndex() {
+        auto url =
+            Mod::get()->getSettingValue<std::string>("macro_index_url");
+
+        if (url.empty()) {
+            setStatus("Index URL is empty.");
+            return;
+        }
+
+        setStatus("Fetching index...");
+
+        indexTask.spawn(
+            geode::utils::web::WebRequest()
+                .userAgent("White Bot Macro Index")
+                .get(url),
+            [this](geode::utils::web::WebResponse response) {
+                this->onIndexResult(std::move(response));
+            }
+        );
+    }
+
+    void onIndexResult(
+        geode::utils::web::WebResponse response
+    ) {
+        if (!response.ok()) {
+            setStatus("Failed to fetch index.");
+            return;
+        }
+
+        auto textResult = response.string();
+
+        if (!textResult) {
+            setStatus("Failed to read index.");
+            return;
+        }
+
+        std::string content = textResult.unwrapOr("");
+
+        if (content.empty()) {
+            setStatus("Index is empty.");
+            return;
+        }
+
+        try {
+            auto json = nlohmann::json::parse(content);
+
+            if (!json.is_array()) {
+                setStatus("Invalid index format.");
+                return;
+            }
+
+            allEntries.clear();
+
+            for (auto const& item : json) {
+                if (!item.is_object())
+                    continue;
+
+                MacroEntry entry;
+
+                entry.levelName =
+                    item.value("level_name", std::string());
+
+                entry.levelId =
+                    item.value("level_id", 0);
+
+                entry.difficulty =
+                    item.value("difficulty", std::string());
+
+                entry.uploader =
+                    item.value("uploader", std::string());
+
+                entry.rating =
+                    item.value("rating", 0.f);
+
+                entry.format =
+                    item.value("format", std::string());
+
+                entry.downloadUrl =
+                    item.value("download_url", std::string());
+
+                if (entry.downloadUrl.empty())
+                    continue;
+
+                allEntries.push_back(std::move(entry));
+            }
+
+            applyFilter(
+                searchInput
+                    ? std::string(searchInput->getString())
+                    : ""
+            );
+
+            setStatus(
+                fmt::format("{} macros available", allEntries.size())
+            );
+        }
+        catch (std::exception const&) {
+            setStatus("Invalid JSON index.");
+        }
+    }
+
+    // ========================================================
+    // Search and results
+    // ========================================================
+
+    void applyFilter(std::string const& query) {
+        filteredEntries.clear();
+
+        std::string lowerQuery = toLower(query);
+
+        for (auto const& entry : allEntries) {
+            if (lowerQuery.empty() ||
+                toLower(entry.levelName).find(lowerQuery) !=
+                    std::string::npos) {
+                filteredEntries.push_back(entry);
+            }
+        }
+
+        populateResults();
+    }
+
+    void populateResults() {
+        clearResults();
+
+        constexpr size_t MAX_RESULTS = 5;
+        constexpr float ROW_SPACING = 23.f;
+
+        size_t count = std::min(
+            MAX_RESULTS,
+            filteredEntries.size()
+        );
+
+        if (count == 0) {
+            auto label = CCLabelBMFont::create(
+                "No macros found.", "chatFont.fnt"
+            );
+
+            label->setScale(0.48f);
+            label->setOpacity(150);
+            label->setPosition({0.f, -5.f});
+
+            resultsMenu->addChild(label);
+            return;
+        }
+
+        for (size_t i = 0; i < count; i++) {
+            auto const& entry = filteredEntries[i];
+
+            float y = -static_cast<float>(i) * ROW_SPACING;
+
+            // Level name
+            std::string name = entry.levelName.empty()
+                ? "Unknown Level"
+                : entry.levelName;
+
+            if (name.size() > 30)
+                name = name.substr(0, 27) + "...";
+
+            auto nameLabel = CCLabelBMFont::create(
+                name.c_str(), "bigFont.fnt"
+            );
+
+            nameLabel->setAnchorPoint({0.f, 0.5f});
+            nameLabel->setPosition({-165.f, y + 5.f});
+            nameLabel->setScale(0.32f);
+
+            resultsMenu->addChild(nameLabel);
+
+            // Metadata
+            std::string info = fmt::format(
+                "ID: {} | {} | {} | {:.1f}",
+                entry.levelId,
+                entry.difficulty.empty()
+                    ? "Unknown"
+                    : entry.difficulty,
+                entry.uploader.empty()
+                    ? "Unknown"
+                    : entry.uploader,
+                entry.rating
+            );
+
+            if (info.size() > 65)
+                info = info.substr(0, 62) + "...";
+
+            auto infoLabel = CCLabelBMFont::create(
+                info.c_str(), "chatFont.fnt"
+            );
+
+            infoLabel->setAnchorPoint({0.f, 0.5f});
+            infoLabel->setPosition({-165.f, y - 6.f});
+            infoLabel->setScale(0.24f);
+            infoLabel->setOpacity(155);
+
+            resultsMenu->addChild(infoLabel);
+
+            // Built-in Geometry Dash download sprite
+            auto downloadSprite =
+                CCSprite::createWithSpriteFrameName(
+                    "GJ_downloadBtn_001.png"
+                );
+
+            if (!downloadSprite) {
+                // Fallback if the sprite frame is unavailable.
+                auto fallback = ButtonSprite::create("Download");
+                fallback->setScale(0.38f);
+
+                auto downloadBtn = CCMenuItemSpriteExtra::create(
+                    fallback,
+                    this,
+                    menu_selector(MacroIndexPopup::onDownloadClicked)
+                );
+
+                downloadBtn->setTag(static_cast<int>(i));
+                downloadBtn->setPosition({143.f, y});
+
+                resultsMenu->addChild(downloadBtn);
+            }
+            else {
+                downloadSprite->setScale(0.55f);
+
+                auto downloadBtn = CCMenuItemSpriteExtra::create(
+                    downloadSprite,
+                    this,
+                    menu_selector(MacroIndexPopup::onDownloadClicked)
+                );
+
+                downloadBtn->setTag(static_cast<int>(i));
+                downloadBtn->setPosition({143.f, y});
+
+                resultsMenu->addChild(downloadBtn);
+            }
+        }
+    }
+
+    // ========================================================
+    // Download macro
+    // ========================================================
+
+    void onDownloadClicked(CCObject* sender) {
+        auto button =
+            static_cast<CCMenuItemSpriteExtra*>(sender);
+
+        int index = button->getTag();
+
+        if (index < 0 ||
+            static_cast<size_t>(index) >= filteredEntries.size()) {
+            return;
+        }
+
+        MacroEntry entry = filteredEntries[index];
+
+        if (entry.downloadUrl.empty()) {
+            setStatus("Invalid download URL.");
+            return;
+        }
+
+        auto folder =
+            Mod::get()->getSettingValue<std::filesystem::path>(
+                "macros_folder"
+            );
+
+        try {
+            std::filesystem::create_directories(folder);
+        }
+        catch (...) {
+            setStatus("Failed to create macros folder.");
+            return;
+        }
+
+        std::string filename = sanitizeFilename(entry.levelName);
+        std::string extension = getExtension(entry.format);
+
+        std::filesystem::path output =
+            folder / (filename + extension);
+
+        int collision = 1;
+
+        while (std::filesystem::exists(output)) {
+            output = folder / fmt::format(
+                "{} ({}){}",
+                filename,
+                collision,
+                extension
+            );
+
+            ++collision;
+        }
+
+        std::filesystem::path temporary = output;
+        temporary += ".part";
+
+        setStatus(
+            fmt::format("Downloading {}...", entry.levelName)
+        );
+
+        downloadTask.spawn(
+            geode::utils::web::WebRequest()
+                .userAgent("White Bot Macro Index")
+                .get(entry.downloadUrl),
+            [this, output, temporary, entry](
+                geode::utils::web::WebResponse response
+            ) {
+                if (!response.ok()) {
+                    setStatus("Download failed.");
+                    return;
+                }
+
+                auto data = response.data();
+
+                if (data.empty()) {
+                    setStatus("Downloaded file is empty.");
+                    return;
+                }
+
+                try {
+                    // Write to a temporary file first.
+                    std::ofstream file(
+                        temporary,
+                        std::ios::binary | std::ios::trunc
+                    );
+
+                    if (!file.is_open()) {
+                        setStatus("Cannot create macro file.");
+                        return;
+                    }
+
+                    file.write(
+                        reinterpret_cast<const char*>(data.data()),
+                        static_cast<std::streamsize>(data.size())
+                    );
+
+                    file.close();
+
+                    if (!file) {
+                        std::filesystem::remove(temporary);
+                        setStatus("Failed to write macro file.");
+                        return;
+                    }
+
+                    // Publish the completed file in the macros folder.
+                    std::error_code ec;
+                    std::filesystem::rename(
+                        temporary,
+                        output,
+                        ec
+                    );
+
+                    if (ec) {
+                        std::filesystem::remove(temporary);
+                        setStatus("Failed to finalize macro file.");
+                        return;
+                    }
+
+                    setStatus(
+                        fmt::format(
+                            "Downloaded: {}",
+                            output.filename().string()
+                        )
+                    );
+
+                    Notification::create(
+                        "Macro Downloaded",
+                        NotificationIcon::Success
+                    )->show();
+                }
+                catch (...) {
+                    std::error_code ec;
+                    std::filesystem::remove(temporary, ec);
+                    setStatus("Failed to save macro.");
+                }
+            }
+        );
+    }
+
+    // ========================================================
+    // Buttons
+    // ========================================================
+
+    void onRefresh(CCObject*) {
+        fetchIndex();
+    }
+
+    void onApplyHost(CCObject*) {
+        if (!hostInput)
+            return;
+
+        std::string url = hostInput->getString();
+
+        if (url.empty()) {
+            setStatus("Index URL is empty.");
+            return;
+        }
+
+        Mod::get()->setSettingValue<std::string>(
+            "macro_index_url",
+            url
+        );
+
+        setStatus("Index URL updated.");
+        fetchIndex();
+    }
 
 public:
-  void textChanged(CCTextInputNode *node) override {
-    if (!node)
-      return;
-
-    if (node == searchInput) {
-      applyFilter(
-          std::string(searchInput->getString()));
-    }
-  }
-
-  static MacroIndexPopup *create() {
-    auto ret = new MacroIndexPopup();
-
-    if (ret->init(390.f, 335.f)) {
-      ret->autorelease();
-      return ret;
+    void textChanged(CCTextInputNode* node) override {
+        if (node == searchInput) {
+            applyFilter(std::string(searchInput->getString()));
+        }
     }
 
-    delete ret;
-    return nullptr;
-  }
+    static MacroIndexPopup* create() {
+        auto ret = new MacroIndexPopup();
 
-  static void open() {
-    auto layer = MacroIndexPopup::create();
+        if (ret->init(385.f, 291.f)) {
+            if (!ret->setup()) {
+                delete ret;
+                return nullptr;
+            }
 
-    if (!layer)
-      return;
+            ret->autorelease();
+            return ret;
+        }
 
-    layer->m_noElasticity = true;
-    layer->show();
-  }
+        delete ret;
+        return nullptr;
+    }
+
+    static void open() {
+        auto layer = MacroIndexPopup::create();
+
+        if (!layer)
+            return;
+
+        layer->m_noElasticity = true;
+        layer->show();
+    }
 };
 
 } // namespace
