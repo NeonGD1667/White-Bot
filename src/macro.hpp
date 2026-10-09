@@ -49,7 +49,7 @@ struct input : gdr::Input {
 };
 
 struct Macro : gdr::Replay<Macro, input> {
-    Macro() : Replay("Dll Bot", DllBotVersion.c_str()) {}
+    Macro() : Replay("White Bot", WhiteBotVersion.c_str()) {}
 
     bool canChangeFPS = true;
     uintptr_t seed = 0;

@@ -387,7 +387,7 @@ void Macro::updateInfo(PlayLayer* pl) {
             : author;
 
     g.macro.botInfo.name = "Dll Bot";
-    g.macro.botInfo.version = DllBotVersion;
+    g.macro.botInfo.version = WhiteBotVersion;
     g.macro.DllBotMacro = true;
 }
 
