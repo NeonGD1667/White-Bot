@@ -1727,7 +1727,7 @@ bool RecordLayer::setup() {
 
   CCLabelBMFont *versionLabel =
       CCLabelBMFont::create(
-          ("DllBot " + DllBotVersion).c_str(),
+          ("White Bot " + WhiteBotVersion).c_str(),
           "chatFont.fnt");
 
   versionLabel->setOpacity(63);
