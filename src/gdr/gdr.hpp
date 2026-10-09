@@ -23,7 +23,7 @@ std::vector<std::string> splitByChar(
     char splitChar
 );
 
-const std::string DllBotVersion = "v3.0.1-Neon";
+const std::string WhiteBotVersion = "v3.1.0-Neon";
 
 namespace gdr {
 
