@@ -1727,7 +1727,7 @@ bool RecordLayer::setup() {
 
   CCLabelBMFont *versionLabel =
       CCLabelBMFont::create(
-          ("White Bot " + WhiteBotVersion).c_str(),
+        ("White Bot " + WhiteBotVersion).c_str(),
           "chatFont.fnt");
 
   versionLabel->setOpacity(63);
@@ -1798,6 +1798,8 @@ bool RecordLayer::setup() {
   menu->addChild(bg);
   rgbBackgrounds.push_back(bg);
 
+  // Nền cột Settings: KHÔNG set anchor (giữ mặc định ở tâm),
+  // nên position (103, 2) chính là tâm của panel.
   bg = CCScale9Sprite::create(
       "square02b_001.png",
       {0, 0, 80, 80});
@@ -1805,12 +1807,10 @@ bool RecordLayer::setup() {
   bg->setScale(0.7f);
   bg->setColor({0, 0, 0});
   bg->setOpacity(75);
-  bg->setPosition(
-      ccp(103, 2));
-  bg->setAnchorPoint(
-      {0, 1});
   bg->setContentSize(
       {313, 339});
+  bg->setPosition(
+      ccp(103, 2));
 
   menu->addChild(bg);
   rgbBackgrounds.push_back(bg);
