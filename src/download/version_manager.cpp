@@ -1028,9 +1028,9 @@ protected:
             auto level = compatOf(release);
             if (auto image = typeinfo_cast<CCRGBAProtocol*>(alertBtn->getNormalImage())) {
                 if (level == Compat::Danger)
-                    image->setColor({255, 90, 90});
+                    image->setColor(cocos2d::ccColor3B{255, 90, 90});
                 else if (level == Compat::Note)
-                    image->setColor({190, 190, 190});
+                    image->setColor(cocos2d::ccColor3B{190, 190, 190});
             }
 
             alertBtn->setPosition({112.f, ROW_H / 2.f});
