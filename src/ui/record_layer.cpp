@@ -648,7 +648,8 @@ const std::vector<std::vector<RecordSetting>> settings{
         {"Instant Mirror Portal:", "instant_mirror_portal", InputType::None},
         {"No Mirror Portal:", "no_mirror_portal", InputType::None},
         {"Auto Safe Mode:", "macro_auto_safe_mode", InputType::None},
-        {"Enable Blur:", "menu_enable_blur", InputType::None}
+        {"Enable Blur:", "menu_enable_blur", InputType::None},
+        {"Enable RGB UI:", "menu_rgb_ui", InputType::None}
     },
 
     // Page 6 — UI
@@ -1311,6 +1312,13 @@ void RecordLayer::toggleSetting(CCObject *obj) {
       WhiteBot::Blur::enable();
     else
       WhiteBot::Blur::disable();
+  }
+
+  if (id == "menu_rgb_ui") {
+    // RGBEffect không khôi phục màu gốc -> dựng lại menu để khớp trạng thái.
+    this->onClose(nullptr);
+    RecordLayer::openMenu(true);
+    return;
   }
 
   if (id == "macro_pathfinder_enabled") {
@@ -2390,20 +2398,21 @@ bool RecordLayer::setup() {
   goToSettingsPage(
       g.currentPage);
 
-  if (Mod::get()->getSettingValue<bool>(
-          "rgb_ui")) {
-    std::vector<cocos2d::CCNode *> rgbTargets(
-        rgbBackgrounds.begin(),
-        rgbBackgrounds.end());
-
-    RGBEffect *fx =
-        RGBEffect::create(
-            rgbTargets,
-            60.f,
-            0.8f,
-            0.55f);
-
-    m_mainLayer->addChild(fx);
+  // Công tắc nằm trong saved value "menu_rgb_ui" (checkbox "Enable RGB UI"
+  // ở trang 5, xử lý trong toggleSetting). Mặc định tắt.
+  // Chế độ cả cây, gắn vào CHÍNH RecordLayer (this) nên phủ toàn bộ:
+  // nền popup, title, nút close, panel, nút, checkbox, viền và cả chữ.
+  // Lớp tối phủ màn hình (RecordLayer là CCLayerColor) cố ý KHÔNG bị tô.
+  // Muốn loại một node thì đặt ID bắt đầu bằng "no-rgb".
+  if (Mod::get()->getSavedValue<bool>(
+          "menu_rgb_ui")) {
+    this->addChild(
+        RGBEffect::createTree(
+            60.f,   // speed
+            0.8f,   // saturation
+            0.85f,  // value
+            10.f,   // spread: độ hue lệch theo mỗi 100 đơn vị X
+            true)); // tintLabels: tô cả chữ
   }
 
   CCSprite *dickordSpr =
@@ -3114,15 +3123,16 @@ void RecordLayer::onDiscord(CCObject *) {
 void RecordLayer::onTelegram(CCObject *) {
   geode::createQuickPopup(
       "Telegram",
-      "Join the <cy>Telegram</c> channel?\n"
-      "(<cl>t.me/gdmacros</c>).",
+      "Telegram is <cr>not available</c> for White Bot.\n"
+      "Join the <cb>Discord</c> server instead?\n"
+      "(<cl>discord.gg/vsDCdnDrjv</c>).",
       "No",
       "Yes",
       [](auto, bool btn2) {
         if (btn2)
           geode::utils::web::
               openLinkInBrowser(
-                  "https://t.me/gdmacros");
+                  "https://discord.gg/vsDCdnDrjv");
       });
 }
 

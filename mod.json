@@ -290,13 +290,7 @@
         "background_color": {
             "name": "Menu background color",
             "type": "color",
-            "default": "#334499"
-        },
-        "rgb_ui": {
-            "name": "RGB UI",
-            "description": "Change the bot's UI color to a continuous RGB cycle effect instead of a static color.",
-            "type": "bool",
-            "default": false
+            "default": "#ffffff"
         },
         "menu_background_opacity": {
             "name": "Menu background opacity",
