@@ -2,18 +2,26 @@ cmake_minimum_required(VERSION 3.21)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
+
+# Platform architectures
+if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
+    set(CMAKE_OSX_ARCHITECTURES "arm64")
+else()
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
+endif()
+
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
-project(DllBot
-    VERSION 3.0.1
+project(WhiteBot 
+    VERSION 3.1.0
     LANGUAGES CXX
 )
 
-
+# Read mod ID from mod.json
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/mod.json" MOD_JSON)
 string(JSON MOD_ID GET "${MOD_JSON}" id)
 
+# Mod source files
 add_library(${PROJECT_NAME} SHARED
     src/main.cpp
     src/global.cpp
@@ -24,7 +32,7 @@ add_library(${PROJECT_NAME} SHARED
     src/gdr/gdr.cpp
     src/renderer/renderer.cpp
     src/download/version_manager.cpp
-    
+
     src/hacks/other.cpp
     src/hacks/tps_bypass.cpp
     src/hacks/frame_stepper.cpp
@@ -51,44 +59,39 @@ add_library(${PROJECT_NAME} SHARED
     src/practice_fixes/play_layer.cpp
 )
 
+# Locate Geode SDK
 if (NOT DEFINED ENV{GEODE_SDK})
-    message(FATAL_ERROR "Unable to find Geode SDK! Please define GEODE_SDK environment variable to point to Geode")
+    message(FATAL_ERROR
+        "Unable to find Geode SDK! Please define GEODE_SDK environment variable to point to Geode"
+    )
 else()
     message(STATUS "Found Geode: $ENV{GEODE_SDK}")
 endif()
 
 add_subdirectory(
-    $ENV{GEODE_SDK}
-    ${CMAKE_CURRENT_BINARY_DIR}/geode
+    "$ENV{GEODE_SDK}"
+    "${CMAKE_CURRENT_BINARY_DIR}/geode"
 )
 
 setup_geode_mod(${PROJECT_NAME})
 
-
 # nlohmann/json
-# Header-only JSON library
 CPMAddPackage(
     NAME nlohmann_json
     GITHUB_REPOSITORY nlohmann/json
     GIT_TAG v3.11.3
 )
 
-# Geode already uses the plain signature of target_link_libraries,
-# so nlohmann_json must use the same signature.
 target_link_libraries(${PROJECT_NAME}
     nlohmann_json::nlohmann_json
 )
 
-
 # SLC include root
-# Allows SLC headers to use:
-#   #include "util.hpp"
-#   #include "formats/v3/metadata.hpp"
 target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gdr/slc
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/gdr/slc"
 )
 
-
+# Deploy packaged mod to local Geometry Dash mods folder on Windows
 if (WIN32)
     set(
         DESKTOP_GEODE_MODS_DIR
@@ -109,10 +112,10 @@ if (WIN32)
     )
 endif()
 
-
+# MSVC-specific compiler settings
 if (MSVC)
     # Disable Link-Time Code Generation (WholeProgramOptimization)
-    # which causes CL.exe crash
+    # which can cause CL.exe crashes.
     set_property(
         TARGET ${PROJECT_NAME}
         PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE
@@ -128,7 +131,6 @@ if (MSVC)
         PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
     )
 
-    # Add flags to help with massive files
     target_compile_options(${PROJECT_NAME} PRIVATE
         /Zm200
         /bigobj
