@@ -19,16 +19,6 @@
                 "android",
                 "ios"
             ]
-        },
-        "geode.custom-keybinds": {
-            "version": ">=v2.1.0",
-            "required": true,
-            "platforms": [
-                "win",
-                "android",
-                "mac",
-                "ios"
-            ]
         }
     },
     "settings": {
