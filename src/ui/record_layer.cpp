@@ -1082,7 +1082,7 @@ bool RecordLayer::setup() {
 
   CCLabelBMFont *versionLabel =
       CCLabelBMFont::create(
-          ("DllBot " + DllBotVersion).c_str(),
+          ("White Bot " + WhiteBotVersion).c_str(),
           "chatFont.fnt");
 
   versionLabel->setOpacity(63);
@@ -1879,11 +1879,11 @@ bool RecordLayer::setup() {
   // Telegram button replaced by Macro Index.
   // folder.png is an external resource.
   //
-  CCSprite *macroIndexSpr =
-      CCSprite::create("folder.png"_spr);
+ CCSprite *macroIndexSpr =
+    CCSprite::createWithSpriteFrameName("GJ_likeBtn_001.png");
 
-  if (macroIndexSpr) {
-    macroIndexSpr->setScale(0.9f);
+if (macroIndexSpr) {
+  macroIndexSpr->setScale(0.8f);
 
     CCMenuItemSpriteExtra *macroIndexBtn =
         CCMenuItemSpriteExtra::create(
