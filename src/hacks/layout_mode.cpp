@@ -32,7 +32,7 @@ class $modify(PlayLayer) {
     bool init(GJGameLevel * level, bool b1, bool b2) {
         auto& g = Global::get();
 
-#ifdef GEODE_IS_ANDROID
+#if defined(GEODE_IS_ANDROID) || defined(GEODE_IS_IOS)
 
         if (robtopLevelIDs.contains(level->m_levelID.value()))
             return PlayLayer::init(level, b1, b2);

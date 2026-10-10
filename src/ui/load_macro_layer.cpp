@@ -275,7 +275,7 @@ void LoadMacroLayer::onImportMacro(CCObject *) {
 
 bool LoadMacroLayer::setup() {
 
-#ifdef GEODE_IS_ANDROID
+#if defined(GEODE_IS_ANDROID) || defined(GEODE_IS_IOS)
   invertSort = true;
 #endif
 
@@ -454,7 +454,7 @@ void LoadMacroLayer::updateSort(CCObject *) {
 
   invertSort = !sortToggle->isToggled();
 
-#ifdef GEODE_IS_ANDROID
+#if defined(GEODE_IS_ANDROID) || defined(GEODE_IS_IOS)
   invertSort = !invertSort;
 #endif
 

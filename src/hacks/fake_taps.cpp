@@ -118,7 +118,7 @@ class $modify(FakeTapsCCEGLView, CCEGLView) {
     }
 };
 
-#elif defined(GEODE_IS_ANDROID) || defined(GEODE_IS_MACOS)
+#elif defined(GEODE_IS_ANDROID) || defined(GEODE_IS_MACOS) || defined(GEODE_IS_IOS)
 
 class $modify(FakeTapsCCDirector, CCDirector) {
     void drawScene() {

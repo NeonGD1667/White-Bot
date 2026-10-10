@@ -431,7 +431,7 @@ $execute {
         "autosaves_folder", g.mod->getSaveDir() / "autosaves");
   }
 
-#ifdef GEODE_IS_ANDROID
+#if defined(GEODE_IS_ANDROID) || defined(GEODE_IS_IOS)
 
   if (!g.mod->setSavedValue("defaults_set_15", true))
     g.mod->setSavedValue("render_video_args", std::string(""));
@@ -501,7 +501,7 @@ $execute {
     g.mod->setSavedValue("render_record_audio", true);
     g.mod->setSavedValue("render_hide_labels", true);
 
-#ifdef GEODE_IS_ANDROID
+#if defined(GEODE_IS_ANDROID) || defined(GEODE_IS_IOS)
     // Mobile defaults: prefer level-song mixing and avoid colorspace args.
     g.mod->setSavedValue("render_video_args", std::string(""));
     g.mod->setSavedValue("render_record_audio", false);
@@ -532,7 +532,7 @@ $execute {
     g.mod->setSavedValue("menu_pause_on_open", false);
     g.mod->setSavedValue("menu_show_cursor", true);
 
-#ifdef GEODE_IS_ANDROID
+    #if defined(GEODE_IS_ANDROID) || defined(GEODE_IS_IOS)
     g.mod->setSavedValue("menu_show_cursor", false);
 #endif
   }
