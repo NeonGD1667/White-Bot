@@ -1162,8 +1162,6 @@ bool RecordLayer::setup() {
   bg->setOpacity(75);
   bg->setPosition(
       ccp(103, 2));
-  bg->setAnchorPoint(
-      {0, 1});
   bg->setContentSize(
       {313, 339});
 
