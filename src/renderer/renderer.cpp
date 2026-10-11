@@ -1172,10 +1172,16 @@ void Renderer::startAudio(PlayLayer *pl) {
     return;
 
   if (pl->m_levelEndAnimationStarted && endLevelLayer != nullptr) {
+#ifdef GEODE_IS_IOS
+    // iOS: CCKeyboardDispatcher không có binding trong Geode (hàm không có địa
+    // chỉ iOS -> lỗi link), nên gọi thẳng handler phím của EndLevelLayer.
+    endLevelLayer->keyDown(enumKeyCodes::KEY_Space, 0.0);
+#else
     CCKeyboardDispatcher::get()->dispatchKeyboardMSG(enumKeyCodes::KEY_Space,
                                                      true, false, 0.0);
     CCKeyboardDispatcher::get()->dispatchKeyboardMSG(enumKeyCodes::KEY_Space,
                                                      false, false, 0.0);
+#endif
   } else if (!pl->m_levelEndAnimationStarted) {
 
     if (!pl->m_isPaused)
