@@ -2547,14 +2547,14 @@ void RecordLayer::onDiscord(CCObject *) {
   geode::createQuickPopup(
       "Discord",
       "Join the <cb>Discord</c> server?\n"
-      "(<cl>discord.gg/w6yvdzVzBd</c>).",
+      "(<cl>discord.gg/vsDCdnDrjv</c>).",
       "No",
       "Yes",
       [](auto, bool btn2) {
         if (btn2)
           geode::utils::web::
               openLinkInBrowser(
-                  "https://discord.gg/w6yvdzVzBd");
+                  "https://discord.gg/vsDCdnDrjv");
       });
 }
 
