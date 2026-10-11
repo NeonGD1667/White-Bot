@@ -660,7 +660,9 @@ void Renderer::start() {
 #ifdef GEODE_IS_MOBILE
       std::string file =
           audioMode == AudioMode::Song ? songFile : recordedAudioFile.string();
-      auto res = ffmpeg::AudioMixer::mixVideoAudio(path, file, tempPath);
+      auto res = ffmpeg::events::AudioMixer::mixVideoAudio(
+    path, file, tempPath
+);
       log::debug("XD");
       if (res.isErr()) {
         Loader::get()->queueInMainThread([] {
