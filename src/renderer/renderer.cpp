@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <vector>
 
 namespace {
 constexpr auto HDR_EXTRA_ARGS_LIBX265 =
@@ -33,6 +34,35 @@ constexpr auto HDR_EXTRA_ARGS_NVENC =
     "-color_primaries bt2020 -color_trc arib-std-b67 -colorspace bt2020nc";
 
 constexpr auto HDR_VIDEO_ARGS = "scale=out_color_matrix=bt709,eq=contrast=0.9";
+
+// Đọc framebuffer đang bound vào buffer RGB24 (width * height * 3 byte).
+//
+// iOS dùng OpenGL ES 2: glReadPixels chỉ đảm bảo hỗ trợ GL_RGBA +
+// GL_UNSIGNED_BYTE, đọc GL_RGB sẽ lỗi GL_INVALID_OPERATION. Vì vậy trên iOS
+// đọc RGBA rồi bỏ kênh alpha; các nền tảng khác đọc thẳng RGB như cũ.
+void readPixelsRGB24(int width, int height, std::vector<uint8_t> &out) {
+#ifdef GEODE_IS_IOS
+  static std::vector<uint8_t> rgba; // dùng lại giữa các frame, không cấp phát mới
+  size_t pixels = static_cast<size_t>(width) * static_cast<size_t>(height);
+
+  rgba.resize(pixels * 4);
+  glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+
+  uint8_t const *src = rgba.data();
+  uint8_t *dst = out.data();
+
+  for (size_t i = 0; i < pixels; ++i) {
+    dst[0] = src[0];
+    dst[1] = src[1];
+    dst[2] = src[2];
+
+    src += 4;
+    dst += 3;
+  }
+#else
+  glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, out.data());
+#endif
+}
 } // namespace
 
 class $modify(CCParticleSystemQuad) {
@@ -279,11 +309,11 @@ void Renderer::start() {
   std::string extension =
       mod->getSavedValue<std::string>("render_file_extension");
 
-  // NakoMod: Feature Toggles
-  renderer.usingPBOs = mod->getSavedValue<bool>("nakomod_pbo");
-  usingMultithreading = mod->getSavedValue<bool>("nakomod_multithreading");
+  // homeless: Feature Toggles
+  renderer.usingPBOs = mod->getSettingValue<bool>("homeless_pbo");
+  usingMultithreading = mod->getSettingValue<bool>("homeless_multithreading");
 
-  std::string hwAccel = mod->getSavedValue<std::string>("nakomod_hw_accel");
+  std::string hwAccel = mod->getSettingValue<std::string>("homeless_hw_accel");
   if (hwAccel == "NVIDIA (NVENC)") {
     codec = "h264_nvenc";
   } else if (hwAccel == "AMD (AMF)") {
@@ -306,8 +336,8 @@ void Renderer::start() {
 #endif
 
   usingAggressivePresets =
-      mod->getSavedValue<bool>("nakomod_aggressive_presets");
-  usingManualVFlip = mod->getSavedValue<bool>("nakomod_vflip_manual");
+      mod->getSettingValue<bool>("homeless_aggressive_presets");
+  usingManualVFlip = mod->getSettingValue<bool>("homeless_vflip_manual");
 
   if (mod->getSavedValue<bool>("render_only_song"))
     audioMode = AudioMode::Song;
@@ -389,7 +419,7 @@ void Renderer::start() {
   settings.m_outputFile = path;
   settings.m_colorspaceFilters = videoArgs;
 
-  // NakoMod: API-specific settings
+  // homeless: API-specific settings
   if (usingManualVFlip) {
     settings.m_doVerticalFlip = false;
   }
@@ -504,7 +534,7 @@ void Renderer::start() {
 #endif
     }
 
-    // NakoMod: Multithreaded frame pulling
+    // homeless: Multithreaded frame pulling
     while (recording || pause || recordingAudio || frameHasData ||
            (!frameQueue.empty() && usingMultithreading)) {
       lock.lock();
@@ -834,11 +864,23 @@ void MyRenderTexture::begin() {
 
     texture = new CCTexture2D();
     {
+#ifdef GEODE_IS_IOS
+      // iOS (OpenGL ES 2): render vào texture RGBA8 - định dạng color-renderable
+      // an toàn - và đọc lại bằng GL_RGBA (xem readPixelsRGB24).
+      constexpr size_t kBytesPerPixel = 4;
+      constexpr auto kPixelFormat = kCCTexture2DPixelFormat_RGBA8888;
+#else
+      constexpr size_t kBytesPerPixel = 3;
+      constexpr auto kPixelFormat = kCCTexture2DPixelFormat_RGB888;
+#endif
+      size_t dataSize = static_cast<size_t>(width) *
+                        static_cast<size_t>(height) * kBytesPerPixel;
+
       std::unique_ptr<char, void (*)(void *)> data(
-          static_cast<char *>(malloc(width * height * 3)), free);
-      memset(data.get(), 0, width * height * 3);
+          static_cast<char *>(malloc(dataSize)), free);
+      memset(data.get(), 0, dataSize);
       texture->initWithData(
-          data.get(), kCCTexture2DPixelFormat_RGB888, width, height,
+          data.get(), kPixelFormat, width, height,
           CCSize(static_cast<float>(width), static_cast<float>(height)));
     }
 
@@ -847,7 +889,8 @@ void MyRenderTexture::begin() {
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0_EXT,
+    // GL_COLOR_ATTACHMENT0 (không có hậu tố _EXT): có trên cả desktop và OpenGL ES.
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                            GL_TEXTURE_2D, texture->getName(), 0);
 
     texture->setAliasTexParameters();
@@ -952,12 +995,13 @@ void MyRenderTexture::capture(std::mutex &lock, std::vector<uint8_t> &data,
       pboIndex = (pboIndex + 1) % 2;
       nextPboIndex = (pboIndex + 1) % 2;
 #else
+      // Mobile (OpenGL ES) không có PBO: đọc trực tiếp.
       hasData = true;
-      glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, data.data());
+      readPixelsRGB24(width, height, data);
 #endif
     } else {
       hasData = true;
-      glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, data.data());
+      readPixelsRGB24(width, height, data);
     }
 
     lock.unlock();
