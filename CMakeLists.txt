@@ -17,16 +17,6 @@ project(WhiteBot
     LANGUAGES CXX
 )
 
-# iOS only: force-include fmod.hpp so GeneratedSource.cpp has the FMOD_* types.
-# Same idea as geode-sdk/bindings#1390, but kept out of the bindings so other
-# platforms are unaffected.
-# This MUST stay after project(): CMake's compiler check runs inside project()
-# and would fail because the Geode include path doesn't exist yet at that point.
-# It also stays before add_subdirectory(GEODE_SDK) so the flag reaches Geode's targets.
-if ("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS)
-    string(APPEND CMAKE_CXX_FLAGS " -include Geode/fmod/fmod.hpp")
-endif()
-
 # Read mod ID from mod.json
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/mod.json" MOD_JSON)
 string(JSON MOD_ID GET "${MOD_JSON}" id)
