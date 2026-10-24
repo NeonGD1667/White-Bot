@@ -25,6 +25,10 @@ jobs:
           - name: iOS
             os: macos-latest
             target: iOS
+            # Chỉ iOS: ép include fmod.hpp để GeneratedSource.cpp có kiểu FMOD_*.
+            # Giống phần CMake trong PR geode-sdk/bindings#1390 nhưng không đụng
+            # tới bindings, nên các nền tảng khác không bị ảnh hưởng.
+            configure-args: '-DCMAKE_CXX_FLAGS=-includeGeode/fmod/fmod.hpp'
 
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
@@ -38,10 +42,7 @@ jobs:
           sdk: '5.11.2'
           combine: true
           target: ${{ matrix.config.target }}
-          # Tạm thời dùng bindings có bản vá cho GD 2.2081
-          # (PR geode-sdk/bindings#1390, chưa merge). Khi PR được merge thì xoá 2 dòng dưới.
-          bindings: vwtfafa/bindings
-          bindings-ref: c0c808828d456e54164b60a589b0edd6172b327a
+          configure-args: ${{ matrix.config.configure-args }}
 
   package:
     name: Package builds
