@@ -25,8 +25,6 @@ jobs:
           - name: iOS
             os: macos-latest
             target: iOS
-            # Build Codegen từ chính bindings đang checkout thay vì tải bản có sẵn.
-            configure-args: '-DSKIP_BUILDING_CODEGEN=OFF'
 
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
@@ -40,18 +38,10 @@ jobs:
           sdk: '5.11.2'
           combine: true
           target: ${{ matrix.config.target }}
-          configure-args: ${{ matrix.config.configure-args }}
-
-      - name: Diagnose bindings
-        if: always() && matrix.config.name == 'iOS'
-        shell: bash
-        run: |
-          git -C build/_deps/bindings-src log -1 --format='bindings: %H %ad' || true
-          git -C geode-sdk-clone log -1 --format='sdk: %H %ad' || true
-          echo "--- FMOD_RESULT được khai báo ở:"
-          grep -rl "FMOD_RESULT" geode-sdk-clone/loader/include/Geode/fmod | head || true
-          echo "--- 30 dòng đầu GeneratedSource.cpp:"
-          head -n 30 build/bindings/bindings/Geode/GeneratedSource.cpp || true
+          # Tạm thời dùng bindings có bản vá cho GD 2.2081
+          # (PR geode-sdk/bindings#1390, chưa merge). Khi PR được merge thì xoá 2 dòng dưới.
+          bindings: vwtfafa/bindings
+          bindings-ref: c0c808828d456e54164b60a589b0edd6172b327a
 
   package:
     name: Package builds
