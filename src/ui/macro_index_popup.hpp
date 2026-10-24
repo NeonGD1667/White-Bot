@@ -5,6 +5,16 @@
 //   - ListView (GJCommentListLayer) có viền, nền tối, hàng xen kẽ màu, scrollbar
 //   - hàng dưới: ô Index URL + Apply + Refresh
 //
+// Định dạng index được hỗ trợ:
+//   [ {...}, {...} ]                       (mảng ở root)
+//   { "macros": [ {...} ] }                (hoặc "data" / "items")
+//
+// Mỗi entry chấp nhận:
+//   tên      : "level_name" | "name" | "id"
+//   link tải : "download_url" | "file"  (đường dẫn tương đối sẽ được ghép với
+//              thư mục của Index URL)
+//   tuỳ chọn : "level_id", "difficulty", "uploader", "rating", "format"
+//
 // Chỉ include file này từ record_layer.cpp.
 
 #include "../includes.hpp"
@@ -21,6 +31,8 @@
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <string>
+#include <vector>
 
 // Menu của mỗi hàng: chỉ nhận chạm khi điểm chạm nằm trong vùng nhìn thấy của
 // list. Nếu không, hàng đã cuộn ra ngoài (bị cắt) vẫn bấm xuyên qua được.
@@ -52,14 +64,16 @@ public:
 class MacroIndexPopup : public geode::Popup {
 private:
   struct MacroEntry {
+    std::string id;
     std::string levelName;
     std::string lowerName;
+    std::string searchText; // tên + id + level id + uploader (lower-case)
     int levelId = 0;
     std::string difficulty;
     std::string uploader;
     float rating = 0.f;
     std::string format;
-    std::string downloadUrl;
+    std::string downloadUrl; // luôn là URL tuyệt đối
   };
 
   static constexpr float LIST_WIDTH = 323.f;
@@ -81,6 +95,7 @@ private:
 
   std::string search;
   std::string errorText;
+  std::string indexUrl; // URL index đang dùng (đã normalize), để ghép link tương đối
   bool loading = false;
   bool invertSort = false;
   bool downloading = false;
@@ -160,6 +175,96 @@ private:
       return ".slc3";
 
     return ".gdr2";
+  }
+
+  // Đọc string an toàn: chấp nhận string / số / bool, còn lại (null, object...)
+  // trả về rỗng thay vì ném exception.
+  static std::string getString(nlohmann::json const &j, char const *key) {
+    auto it = j.find(key);
+
+    if (it == j.end())
+      return {};
+
+    if (it->is_string())
+      return it->get<std::string>();
+
+    if (it->is_number() || it->is_boolean())
+      return it->dump();
+
+    return {};
+  }
+
+  // Đọc số an toàn: chấp nhận số hoặc string chứa số.
+  static double getNumber(nlohmann::json const &j, char const *key) {
+    auto it = j.find(key);
+
+    if (it == j.end())
+      return 0.0;
+
+    if (it->is_number())
+      return it->get<double>();
+
+    if (it->is_string()) {
+      try {
+        return std::stod(it->get<std::string>());
+      } catch (...) {
+      }
+    }
+
+    return 0.0;
+  }
+
+  // Đổi link github.com (trang repo / blob) sang raw.githubusercontent.com.
+  //   github.com/user/repo                   -> raw/user/repo/main/index.json
+  //   github.com/user/repo/blob/main/x.json  -> raw/user/repo/main/x.json
+  static std::string normalizeIndexUrl(std::string url) {
+    while (!url.empty() && std::isspace(static_cast<unsigned char>(url.back())))
+      url.pop_back();
+
+    while (!url.empty() && std::isspace(static_cast<unsigned char>(url.front())))
+      url.erase(url.begin());
+
+    std::string const gh = "https://github.com/";
+
+    if (url.rfind(gh, 0) != 0)
+      return url;
+
+    std::string path = url.substr(gh.size());
+
+    auto blob = path.find("/blob/");
+    if (blob != std::string::npos) {
+      return "https://raw.githubusercontent.com/" + path.substr(0, blob) + "/" +
+             path.substr(blob + 6);
+    }
+
+    while (!path.empty() && path.back() == '/')
+      path.pop_back();
+
+    // Link gốc của repo (user/repo) -> mặc định main/index.json
+    if (std::count(path.begin(), path.end(), '/') == 1)
+      return "https://raw.githubusercontent.com/" + path + "/main/index.json";
+
+    return url;
+  }
+
+  // "macros/gdr/a.gdr" + ".../index.json" -> ".../macros/gdr/a.gdr"
+  static std::string resolveUrl(std::string const &base, std::string file) {
+    if (file.rfind("http://", 0) == 0 || file.rfind("https://", 0) == 0)
+      return file;
+
+    auto slash = base.find_last_of('/');
+    std::string dir =
+        slash == std::string::npos ? base : base.substr(0, slash + 1);
+
+    while (!file.empty() && file.front() == '/')
+      file.erase(file.begin());
+
+    std::string out = dir + file;
+
+    for (size_t pos = 0; (pos = out.find(' ', pos)) != std::string::npos;)
+      out.replace(pos, 1, "%20");
+
+    return out;
   }
 
   // ========================================================
@@ -309,10 +414,32 @@ private:
     nameLabel->setPosition({10.f, 23.f});
     row->addChild(nameLabel);
 
-    std::string info = fmt::format(
-        "ID: {} | {} | {} | {:.1f}", entry.levelId,
-        entry.difficulty.empty() ? "Unknown" : entry.difficulty,
-        entry.uploader.empty() ? "Unknown" : entry.uploader, entry.rating);
+    // Dòng phụ: chỉ hiện những field có dữ liệu.
+    std::string info;
+    auto addPart = [&info](std::string const &part) {
+      if (part.empty())
+        return;
+
+      if (!info.empty())
+        info += " | ";
+
+      info += part;
+    };
+
+    if (entry.levelId > 0)
+      addPart(fmt::format("ID: {}", entry.levelId));
+
+    addPart(entry.difficulty);
+    addPart(entry.uploader);
+
+    if (entry.rating > 0.f)
+      addPart(fmt::format("{:.1f}", entry.rating));
+
+    addPart(entry.format);
+
+    if (info.empty())
+      info = "No info";
+
     info = truncate(info, 70);
 
     auto infoLabel = CCLabelBMFont::create(info.c_str(), "chatFont.fnt");
@@ -523,7 +650,7 @@ private:
 
     for (auto const &entry : allEntries) {
       if (search.empty() ||
-          entry.lowerName.find(search) != std::string::npos) {
+          entry.searchText.find(search) != std::string::npos) {
         filteredEntries.push_back(entry);
       }
     }
@@ -558,7 +685,8 @@ private:
   // ========================================================
 
   void fetchIndex() {
-    auto url = Mod::get()->getSettingValue<std::string>("macro_index_url");
+    auto url = normalizeIndexUrl(
+        Mod::get()->getSettingValue<std::string>("macro_index_url"));
 
     if (url.empty()) {
       allEntries.clear();
@@ -568,6 +696,7 @@ private:
       return;
     }
 
+    indexUrl = url;
     loading = true;
     errorText.clear();
     rebuildList();
@@ -607,43 +736,79 @@ private:
       return;
     }
 
-    try {
-      auto json = nlohmann::json::parse(content);
+    // Không ném exception: trả về is_discarded() nếu JSON lỗi.
+    auto json = nlohmann::json::parse(content, nullptr, false);
 
-      if (!json.is_array()) {
-        failIndex("Invalid index format.");
-        return;
-      }
-
-      allEntries.clear();
-
-      for (auto const &item : json) {
-        if (!item.is_object())
-          continue;
-
-        MacroEntry entry;
-
-        entry.levelName = item.value("level_name", std::string());
-        entry.lowerName = toLower(entry.levelName);
-        entry.levelId = item.value("level_id", 0);
-        entry.difficulty = item.value("difficulty", std::string());
-        entry.uploader = item.value("uploader", std::string());
-        entry.rating = item.value("rating", 0.f);
-        entry.format = item.value("format", std::string());
-        entry.downloadUrl = item.value("download_url", std::string());
-
-        if (entry.downloadUrl.empty())
-          continue;
-
-        allEntries.push_back(std::move(entry));
-      }
-
-      loading = false;
-      errorText.clear();
-      applyFilter();
-    } catch (std::exception const &) {
+    if (json.is_discarded()) {
       failIndex("Invalid JSON index.");
+      return;
     }
+
+    // Cho phép {"macros": [...]} / {"data": [...]} / {"items": [...]}
+    if (json.is_object()) {
+      for (char const *key : {"macros", "data", "items"}) {
+        if (json.contains(key) && json[key].is_array()) {
+          auto arr = json[key];
+          json = std::move(arr);
+          break;
+        }
+      }
+    }
+
+    if (!json.is_array()) {
+      failIndex("Invalid index format.");
+      return;
+    }
+
+    allEntries.clear();
+    size_t skipped = 0;
+
+    for (auto const &item : json) {
+      if (!item.is_object()) {
+        ++skipped;
+        continue;
+      }
+
+      MacroEntry entry;
+
+      entry.id = getString(item, "id");
+
+      entry.levelName = getString(item, "level_name");
+      if (entry.levelName.empty())
+        entry.levelName = getString(item, "name");
+      if (entry.levelName.empty())
+        entry.levelName = entry.id;
+
+      entry.levelId = static_cast<int>(getNumber(item, "level_id"));
+      entry.difficulty = getString(item, "difficulty");
+      entry.uploader = getString(item, "uploader");
+      entry.rating = static_cast<float>(getNumber(item, "rating"));
+      entry.format = getString(item, "format");
+
+      std::string link = getString(item, "download_url");
+      if (link.empty())
+        link = getString(item, "file");
+
+      if (link.empty()) {
+        ++skipped;
+        continue;
+      }
+
+      entry.downloadUrl = resolveUrl(indexUrl, link);
+      entry.lowerName = toLower(entry.levelName);
+      entry.searchText = toLower(fmt::format("{} {} {} {}", entry.levelName,
+                                             entry.id, entry.levelId,
+                                             entry.uploader));
+
+      allEntries.push_back(std::move(entry));
+    }
+
+    geode::log::info("Macro index: {} loaded, {} skipped", allEntries.size(),
+                     skipped);
+
+    loading = false;
+    errorText.clear();
+    applyFilter();
   }
 
   // ========================================================
@@ -775,13 +940,16 @@ private:
     if (!hostInput)
       return;
 
-    std::string url = hostInput->getString();
+    std::string url = normalizeIndexUrl(hostInput->getString());
 
     if (url.empty()) {
       Notification::create("Index URL is empty.", NotificationIcon::Warning)
           ->show();
       return;
     }
+
+    // Hiện lại link đã normalize (vd: link repo -> link raw) trong ô nhập.
+    hostInput->setString(url);
 
     Mod::get()->setSettingValue<std::string>("macro_index_url", url);
 
