@@ -48,9 +48,9 @@ Special thanks to **Zilko** for creating xdBot.
 
 ## Disclaimer
 
-DLL Bot is an unofficial Geometry Dash modification and is not affiliated with or endorsed by RobTop Games.
+**White Bot** is an unofficial Geometry Dash modification and is not affiliated with or endorsed by RobTop Games.
 
-Please respect the original license of DLL Bot and all third-party libraries used by this project.
+Please respect the original license of **White Bot** and all third-party libraries used by this project.
 
 ## License
 

@@ -6,10 +6,10 @@
         "mac": "2.2081",
         "ios": "2.2081"
     },
-    "version": "v3.0.1",
+    "version": "v3.1.0",
     "id": "homeless.white-bot",
     "name": "White Bot",
-    "developers": ["Homeless Team","danhnt","chickendev1667","daucatmoiVN","kisakoGD","ksounl"],
+    "developer": "Homeless Team",
     "description": "Ultimate Bot for GD",
     "dependencies": {
         "eclipse.ffmpeg-api": {

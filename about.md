@@ -1,6 +1,6 @@
-DLL Bot
+# White Bot
 
-<cl>DLL Bot</c> is a high-performance Geometry Dash DLL bot developed by Homeless Team.
+<cl>White Bot</c> is a high-performance Geometry Dash Bot developed by Homeless Team.
 
 Features
 
@@ -21,7 +21,7 @@ Special thanks to Zilko for creating XDBot and contributing to the Geometry Dash
 
 Disclaimer
 
-DLL Bot is an unofficial Geometry Dash modification and is not affiliated with RobTop Games.
+White Bot is an unofficial Geometry Dash modification and is not affiliated with RobTop Games.
 
 Please respect the original license of XDBot and any third-party libraries used in this project.
 
