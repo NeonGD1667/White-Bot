@@ -1,0 +1,32 @@
+name: Check bindings refs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Look for Geode/mapping/array.hpp in each candidate ref
+        shell: bash
+        run: |
+          check() {
+            echo "=== $1 @ $2"
+            rm -rf r
+            git clone -q "https://github.com/$1" r || { echo "clone failed"; return; }
+            if [[ "$2" == refs/* ]]; then
+              git -C r fetch -q origin "$2" && git -C r checkout -q FETCH_HEAD || { echo "ref not found"; return; }
+            else
+              git -C r checkout -q "$2" || { echo "ref not found"; return; }
+            fi
+            git -C r log -1 --format='commit: %h  date: %ad  msg: %s'
+            echo "array.hpp found at:"
+            find r -path '*Geode/mapping/array.hpp' | sed 's/^/  /'
+            echo "ccTypes.hpp found at:"
+            find r -path '*Geode/mapping/ccTypes.hpp' | sed 's/^/  /'
+          }
+
+          check vwtfafa/bindings 5a23683eb6463394f8d48fe919bc4c03c2fd49f4
+          check vwtfafa/bindings main
+          check geode-sdk/bindings main
+          check geode-sdk/bindings refs/pull/1390/merge
