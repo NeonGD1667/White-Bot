@@ -75,6 +75,15 @@ add_subdirectory(
 
 setup_geode_mod(${PROJECT_NAME})
 
+# iOS only: GeneratedSource.cpp (in Geode's GeodeBindings target) uses FMOD_* C
+# types without including an FMOD header. Force-include fmod.hpp for that target
+# ONLY. A global CMAKE_CXX_FLAGS would also hit fmt/asp2/arc, which have no
+# Geode include path, and fail with "file not found".
+# Remove this block once geode-sdk/bindings fixes it upstream (PR #1390).
+if (("${CMAKE_SYSTEM_NAME}" STREQUAL "iOS" OR IOS) AND TARGET GeodeBindings)
+    target_compile_options(GeodeBindings PRIVATE -include Geode/fmod/fmod.hpp)
+endif()
+
 # nlohmann/json
 CPMAddPackage(
     NAME nlohmann_json
