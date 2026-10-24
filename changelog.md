@@ -1,4 +1,10 @@
-# DLL Bot
+# DLL Bot - White Bot
+
+## v3.1.0 
+
+## Fixed
+- Fix FMOD_RESULT in IOS Build
+- Fix SDK taget
 
 ## v3.0.1 — Pre-release
 
