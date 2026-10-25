@@ -28,12 +28,12 @@
         },
         "downgrade-button": {
             "type": "custom:button",
-            "name": "Downgrade DLL Bot"
+            "name": "Downgrade White Bot"
         },
         "update_channel": {
             "type": "string",
             "name": "Update Channel",
-            "description": "Selects which update channel DLL Bot should use.",
+            "description": "Selects which update channel White Bot should use.",
             "default": "Main",
             "one-of": [
                 "Main",
@@ -57,7 +57,7 @@
         "keybind_open_menu": {
             "type": "keybind",
             "name": "Open Menu",
-            "description": "Opens or closes the DLL Bot menu.",
+            "description": "Opens or closes the White Bot menu.",
             "default": [
                 "LeftMenu",
                 "RightMenu"
@@ -322,7 +322,7 @@
         },
         "level_settings_button": {
             "name": "Show Button At Settings",
-            "description": "Shows the DLL Bot button in the level settings layer.",
+            "description": "Shows the White Bot button in the level settings layer.",
             "type": "bool",
             "default": false
         },
@@ -385,7 +385,7 @@
         ]
     },
     "links": {
-        "source": "https://github.com/NeonGD1667/DLL-Bot",
+        "source": "https://github.com/NeonGD1667/White-Bot",
         "community": "https://discord.gg/Wk6QcKdXck"
     },
     "tags": [
