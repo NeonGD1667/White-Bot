@@ -1,33 +1,32 @@
-# DLL Bot - White Bot
+# DLL Bot → White Bot
 
-## v3.1.0
+## v3.1.0 — Winter Update 1 ❄️
 
 ### Added
-
 - Added iOS support.
-- Added Macro Index (about 90% complete, not fully tested yet).
-- Added "Check Updates On Startup" setting.
-- Added a changelog window (with an Install button) for every version in the Version Manager.
+- Added Macro Index (**approximately 90% complete; not fully tested yet**).
+- Added a **Check Updates on Startup** setting.
+- Added a changelog window with an **Install** button for each version in the Version Manager.
 
 ### Improved
-
-- Upgraded Geode SDK from 5.9.0 to 5.11.2.
-- Rendering on Windows and macOS is now about twice as fast.
-- Redesigned the Version Manager: it now shows the channel, release date, and Latest / Current labels, with an info button for each version.
-- Aligned the Settings buttons (Open Menu, Downgrade, update controls) with the rest of the settings.
+- Upgraded the Geode SDK from **5.9.0 to 5.11.2**.
+- Improved rendering performance on Windows and macOS by approximately **2×**.
+- Redesigned the Version Manager to display release channels, release dates, and **Latest** / **Current** labels, with an information button for each version.
+- Improved Settings UI consistency by aligning the **Open Menu**, **Downgrade**, and update controls with the other settings buttons.
 
 ### Fixed
+- Fixed the Downgrade button not opening its intended interface.
+- Fixed an `FMOD_RESULT` issue in the iOS build.
+- Fixed the SDK target configuration.
+- Fixed incorrect RGB rendering in the Record Layer.
+- Fixed panel alignment issues in the Record Layer.
 
-- Fixed the Downgrade button not opening anything.
-- Fixed FMOD_RESULT in iOS build.
-- Fixed SDK target.
-- Fixed issue where RGB is not rendered correctly in the record layer
-- Fixed the misaligned panel in the record layer
-- Remove Dependency Blur API ( replace with blur.hpp i cooked )
+### Removed
+- Removed the Blur API dependency and replaced it with a custom implementation in `blur.hpp`.
 
-> Still supports Geometry Dash 2.2081 only. 2.2091 is not supported yet.
+> **Compatibility:** White Bot v3.1.0 supports Geometry Dash **2.2081 only**. Geometry Dash 2.2091 is not supported yet.
 >
-> White Bot Winter Update 1 - 2026 ❄❄☃⛄⛄
+> **White Bot Winter Update 1 — 2026** ❄️☃️
 
 ---
 
