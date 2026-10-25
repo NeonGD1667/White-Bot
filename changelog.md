@@ -21,6 +21,9 @@
 - Fixed the Downgrade button not opening anything.
 - Fixed FMOD_RESULT in iOS build.
 - Fixed SDK target.
+- Fixed issue where RGB is not rendered correctly in the record layer
+- Fixed the misaligned panel in the record layer
+- Remove Dependency Blur API ( replace with blur.hpp i cooked )
 
 > Still supports Geometry Dash 2.2081 only. 2.2091 is not supported yet.
 >
