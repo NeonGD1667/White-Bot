@@ -1,5 +1,6 @@
 #include "../includes.hpp"
 #include "record_layer.hpp"
+#include "../download/version_manager.hpp"  // openVersionManager()
 
 #include <Geode/loader/SettingV3.hpp>
 #include <Geode/loader/Mod.hpp>
@@ -48,41 +49,37 @@ protected:
         if (!SettingNodeV3::init(setting, width))
             return false;
 
-        auto key = setting->getKey();
-
-        CCSprite* sprite = nullptr;
-
-        // Normal DLL Bot button
-        if (key == "button-setting") {
-            sprite = CCSprite::createWithSpriteFrameName(
-                "GJ_playBtn2_001.png"
-            );
-        }
-        // Fallback for other custom buttons
-        else {
-            sprite = CCSprite::createWithSpriteFrameName(
-                "GJ_playBtn2_001.png"
-            );
-        }
+        // Cả "button-setting" (Open Menu) và "downgrade-button" dùng chung icon.
+        auto sprite = CCSprite::createWithSpriteFrameName(
+            "GJ_playBtn2_001.png"
+        );
 
         if (!sprite)
             return false;
 
         sprite->setScale(0.325f);
 
-        CCMenuItemSpriteExtra* btn =
-            CCMenuItemSpriteExtra::create(
-                sprite,
-                this,
-                menu_selector(MyButtonSettingNodeV3::onButton)
-            );
-
-        getButtonMenu()->addChildAtPosition(
-            btn,
-            Anchor::Center
+        auto btn = CCMenuItemSpriteExtra::create(
+            sprite,
+            this,
+            menu_selector(MyButtonSettingNodeV3::onButton)
         );
 
-        getButtonMenu()->updateLayout();
+        // Menu riêng phủ kín dòng, nút đặt tay sát mép phải và giữa dòng theo chiều dọc.
+        // Không dùng getButtonMenu() + Anchor::Center vì nó đặt nút ở GIỮA nửa phải của dòng
+        // (lệch so với các setting khác như Update Channel).
+        auto menu = CCMenu::create();
+        menu->setAnchorPoint({0.f, 0.f});
+        menu->setPosition({0.f, 0.f});
+        menu->setContentSize(this->getContentSize());
+
+        btn->setPosition({
+            this->getContentWidth() - 38.f,
+            this->getContentHeight() / 2.f
+        });
+
+        menu->addChild(btn);
+        this->addChild(menu);
 
         updateState(nullptr);
 
@@ -96,19 +93,21 @@ protected:
     void onButton(CCObject*) {
         auto key = getSetting()->getKey();
 
-        CCArray* children =
-            CCDirector::sharedDirector()
-                ->getRunningScene()
-                ->getChildren();
-
-        if (FLAlertLayer* layer =
-                typeinfo_cast<FLAlertLayer*>(
-                    children->lastObject()
-                )) {
-            layer->keyBackClicked();
+        // Downgrade: mở Version Manager đè lên trang settings (KHÔNG đóng settings).
+        if (key == "downgrade-button") {
+            openVersionManager();
+            return;
         }
 
         if (key == "button-setting") {
+            // Đóng popup settings đang mở rồi mở menu bot.
+            if (auto scene = CCDirector::sharedDirector()->getRunningScene()) {
+                if (auto children = scene->getChildren()) {
+                    if (auto layer = typeinfo_cast<FLAlertLayer*>(children->lastObject()))
+                        layer->keyBackClicked();
+                }
+            }
+
             RecordLayer::openMenu();
         }
     }
