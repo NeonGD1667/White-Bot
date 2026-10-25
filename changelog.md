@@ -23,6 +23,7 @@
 - Fixed SDK target.
 
 > Still supports Geometry Dash 2.2081 only. 2.2091 is not supported yet.
+
 > White Bot Winter Update 1 ❄❄☃⛄⛄
 
 ---
