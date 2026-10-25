@@ -4,7 +4,7 @@
 #include <Geode/loader/Mod.hpp>
 #include <Geode/modify/MenuLayer.hpp>
 #include <Geode/ui/GeodeUI.hpp>
-#include <Geode/ui/MDPopup.hpp>
+#include <Geode/ui/MDTextArea.hpp>
 #include <Geode/ui/Notification.hpp>
 #include <Geode/ui/NineSlice.hpp>
 #include <Geode/ui/Popup.hpp>
@@ -12,9 +12,11 @@
 #include <Geode/utils/web.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 
 using namespace geode::prelude;
 
@@ -24,11 +26,13 @@ using namespace geode::prelude;
  *  vào game  -> (MenuLayer) check release mới ở nền
  *            -> có bản mới: popup "Update available - open mod settings"
  *  settings  -> nút Check / Download / bánh răng (danh sách version)
+ *            -> nút "Downgrade DLL Bot" mở thẳng Version Manager (openVersionManager)
+ *  Version Manager -> mỗi dòng: nút info (changelog + Install) và nút tải
  *  Download  -> tải <mod>.geode.tmp.part -> kiểm tra (zip + mod.json) -> <mod>.geode.tmp
  *            -> popup "Restart required"
  *  Restart   -> <mod>.geode  ->  <mod>.geode.bak ; .tmp -> <mod>.geode ; xoá .bak ; restart game
  *  "Later"   -> lần mở game sau, $on_mod(Loaded) sẽ cài .tmp còn sót rồi nhắc restart
- *  Bánh răng -> popup liệt kê release (theo update_channel); tải bản cũ dùng chung luồng trên.
+ *  Tải bản cũ dùng chung luồng trên.
  */
 
 namespace {
@@ -95,17 +99,6 @@ std::string describeHttp(int code) {
     if (code == 404)
         return "Not found on GitHub (HTTP 404).";
     return fmt::format("HTTP error {}.", code);
-}
-
-std::string truncateUtf8(std::string const& text, size_t maxBytes) {
-    if (text.size() <= maxBytes)
-        return text;
-
-    size_t n = maxBytes;
-    while (n > 0 && (static_cast<unsigned char>(text[n]) & 0xC0) == 0x80)
-        --n;
-
-    return text.substr(0, n) + "\n...";
 }
 
 void showAlert(char const* title, std::string const& message) {
@@ -558,56 +551,6 @@ Compat compatOf(ReleaseInfo const& release) {
     return Compat::Note;
 }
 
-std::string compatMarkdown(ReleaseInfo const& release) {
-    auto current = Mod::get()->getVersion();
-
-    std::string md = fmt::format("## White Bot {}\n", release.version.toVString());
-
-    if (!release.publishedAt.empty())
-        md += fmt::format("Published: {}\n\n", release.publishedAt);
-
-    if (release.version == current) {
-        md += "- This is the version you are running.\n";
-    }
-    else if (release.version < current) {
-        md += fmt::format(
-            "- Older than your current version ({}). Macros or settings saved "
-            "by a newer version may not load correctly after downgrading.\n",
-            current.toVString()
-        );
-    }
-    else {
-        md += fmt::format(
-            "- Newer than your current version ({}).\n",
-            current.toVString()
-        );
-    }
-
-    if (release.prerelease)
-        md += "- Pre-release build: it may be unstable.\n";
-
-    if (release.version.getMajor() != current.getMajor())
-        md += "- Different major version: saved data and settings may be incompatible.\n";
-
-    if (release.downloadUrl.empty())
-        md += "- This release has no .geode file attached, so it cannot be installed.\n";
-
-    md += "- Geode / Geometry Dash requirements are verified after the download, "
-          "before anything is installed.\n";
-
-    if (!release.body.empty()) {
-        md += "\n---\n### Release notes\n";
-        md += truncateUtf8(release.body, 1500);
-    }
-
-    return md;
-}
-
-void showCompat(ReleaseInfo const& release) {
-    if (auto popup = MDPopup::create("Compatibility", compatMarkdown(release), "OK"))
-        popup->show();
-}
-
 // ---------------------------------------------------------------- install flow
 void promptRestart(std::string const& tag, std::vector<std::string> const& warnings) {
     std::string content = fmt::format(
@@ -851,55 +794,233 @@ CCMenuItemSpriteExtra* makeIconButton(char const* frame, float height, F&& callb
     return CCMenuItemExt::createSpriteExtra(sprite, std::forward<F>(callback));
 }
 
+// ---------------------------------------------------------------- changelog helpers
+bool containsText(std::string const& haystack, char const* needle) {
+    return haystack.find(needle) != std::string::npos;
+}
+
+// Tô màu tiêu đề trong release notes:
+//   Features / Additions   -> vàng (mặc định)
+//   Improvements / Changes -> xanh lá
+//   Fixes / Stability      -> đỏ
+std::string colorizeNotes(std::string const& body) {
+    if (body.empty())
+        return "No release notes for this version.";
+
+    std::string out;
+    std::istringstream stream(body);
+    std::string line;
+
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+
+        if (!line.empty() && line.front() == '#') {
+            auto pos = line.find_first_not_of("# ");
+            std::string title = pos == std::string::npos ? "" : line.substr(pos);
+
+            std::string lower = title;
+            std::transform(
+                lower.begin(),
+                lower.end(),
+                lower.begin(),
+                [](unsigned char c) { return static_cast<char>(std::tolower(c)); }
+            );
+
+            char const* tag = "cy";
+            if (
+                containsText(lower, "fix") ||
+                containsText(lower, "bug") ||
+                containsText(lower, "stab")
+            ) {
+                tag = "cr";
+            }
+            else if (containsText(lower, "improv") || containsText(lower, "change")) {
+                tag = "cg";
+            }
+
+            out += fmt::format("<{}>-- {} --</c>\n\n", tag, title);
+        }
+        else {
+            out += line + "\n";
+        }
+    }
+
+    return out;
+}
+
+// Các dòng cảnh báo tương thích, đặt ở đầu changelog.
+std::string compatNotes(ReleaseInfo const& release) {
+    auto current = Mod::get()->getVersion();
+    std::string out;
+
+    if (release.version == current) {
+        out += "<cg>- You are running this version.</c>\n";
+    }
+    else if (release.version < current) {
+        out += fmt::format(
+            "<cy>- Older than your current version ({}). Macros or settings "
+            "saved by a newer version may not load.</c>\n",
+            current.toVString()
+        );
+    }
+
+    if (release.prerelease)
+        out += "<cr>- Pre-release build: it may be unstable.</c>\n";
+
+    if (release.version.getMajor() != current.getMajor())
+        out += "<cr>- Different major version: saved data may be incompatible.</c>\n";
+
+    if (release.downloadUrl.empty())
+        out += "<cr>- No .geode file is attached, so it cannot be installed.</c>\n";
+
+    if (!out.empty())
+        out += "\n";
+
+    return out;
+}
+
+// ---------------------------------------------------------------- changelog popup
+class ChangelogPopup : public geode::Popup {
+protected:
+    ReleaseInfo m_release;
+
+    bool init(ReleaseInfo const& release) {
+        if (!Popup::init(380.f, 270.f))
+            return false;
+
+        m_release = release;
+        this->setTitle("WHITE BOT CHANGELOG");
+
+        // "v3.1.0  |  Stable"
+        auto version = CCLabelBMFont::create(
+            release.version.toVString().c_str(),
+            "chatFont.fnt"
+        );
+        version->setColor({255, 255, 90});
+        version->setAnchorPoint({0.f, 0.5f});
+        version->setPosition({28.f, 218.f});
+        m_mainLayer->addChild(version);
+
+        auto channelLabel = CCLabelBMFont::create(
+            fmt::format("|  {}", release.prerelease ? "Dev-beta" : "Stable").c_str(),
+            "chatFont.fnt"
+        );
+        channelLabel->setColor(
+            release.prerelease ? ccColor3B{255, 170, 60} : ccColor3B{90, 255, 90}
+        );
+        channelLabel->setAnchorPoint({0.f, 0.5f});
+        channelLabel->setPosition({
+            28.f + version->getScaledContentSize().width + 10.f,
+            218.f
+        });
+        m_mainLayer->addChild(channelLabel);
+
+        // Nội dung changelog (cuộn được)
+        auto bg = NineSlice::create("square02b_001.png");
+        bg->setColor({0, 0, 0});
+        bg->setOpacity(110);
+        bg->setContentSize({340.f, 150.f});
+        bg->setPosition({190.f, 130.f});
+        m_mainLayer->addChild(bg);
+
+        auto area = MDTextArea::create(
+            compatNotes(release) + colorizeNotes(release.body),
+            {330.f, 140.f}
+        );
+        area->setPosition({190.f, 130.f});
+        m_mainLayer->addChild(area);
+
+        // Close / Install
+        auto current = Mod::get()->getVersion();
+        bool installable =
+            !release.downloadUrl.empty() && !(release.version == current);
+
+        auto closeBtn = CCMenuItemExt::createSpriteExtra(
+            ButtonSprite::create("Close", "bigFont.fnt", "GJ_button_01.png", 0.8f),
+            [this](CCMenuItemSpriteExtra*) { this->onClose(nullptr); }
+        );
+        m_buttonMenu->addChildAtPosition(closeBtn, Anchor::Bottom, ccp(-55.f, 28.f));
+
+        auto installBtn = CCMenuItemExt::createSpriteExtra(
+            ButtonSprite::create(
+                "Install",
+                "bigFont.fnt",
+                installable ? "GJ_button_01.png" : "GJ_button_04.png",
+                0.8f
+            ),
+            [this](CCMenuItemSpriteExtra*) {
+                auto rel = m_release;
+                this->onClose(nullptr);
+                confirmInstall(rel);
+            }
+        );
+        installBtn->setEnabled(installable);
+        m_buttonMenu->addChildAtPosition(installBtn, Anchor::Bottom, ccp(55.f, 28.f));
+
+        return true;
+    }
+
+public:
+    static ChangelogPopup* create(ReleaseInfo const& release) {
+        auto ret = new ChangelogPopup();
+
+        if (ret->init(release)) {
+            ret->autorelease();
+            return ret;
+        }
+
+        delete ret;
+        return nullptr;
+    }
+
+    static void open(ReleaseInfo const& release) {
+        if (auto popup = ChangelogPopup::create(release))
+            popup->show();
+    }
+};
+
 // ---------------------------------------------------------------- versions popup
 class VersionListPopup : public geode::Popup {
 protected:
-    static constexpr float LIST_W = 330.f;
-    static constexpr float LIST_H = 160.f;
-    static constexpr float ROW_H = 34.f;
+    static constexpr float LIST_W = 350.f;
+    static constexpr float LIST_H = 190.f;
+    static constexpr float ROW_H = 46.f;
 
     ScrollLayer* m_scroll = nullptr;
     CCLabelBMFont* m_status = nullptr;
     CCMenuItemSpriteExtra* m_retryBtn = nullptr;
 
     bool init() {
-        if (!Popup::init(380.f, 290.f))
+        if (!Popup::init(400.f, 300.f))
             return false;
 
-        this->setTitle("WHITE BOT VERSIONS");
+        this->setTitle("VERSION MANAGER");
 
-        auto header = CCLabelBMFont::create("VERSION", "bigFont.fnt");
-        header->setScale(0.4f);
-        header->setOpacity(160);
-        header->setAnchorPoint({0.f, 0.5f});
-        header->setPosition({28.f, 233.f});
-        m_mainLayer->addChild(header);
-
-        auto channel = CCLabelBMFont::create(
-            fmt::format("Channel: {}", isDevChannel() ? "Dev-beta" : "Main").c_str(),
+        auto subtitle = CCLabelBMFont::create(
+            "Browse every White Bot release. Installing always replaces the current mod.",
             "chatFont.fnt"
         );
-        channel->setScale(0.5f);
-        channel->setOpacity(160);
-        channel->setAnchorPoint({1.f, 0.5f});
-        channel->setPosition({352.f, 233.f});
-        m_mainLayer->addChild(channel);
+        subtitle->setOpacity(190);
+        subtitle->limitLabelWidth(360.f, 0.5f, 0.2f);
+        subtitle->setPosition({200.f, 234.f});
+        m_mainLayer->addChild(subtitle);
 
         auto listBg = NineSlice::create("square02b_001.png");
         listBg->setColor({0, 0, 0});
         listBg->setOpacity(90);
         listBg->setContentSize({LIST_W + 10.f, LIST_H + 10.f});
-        listBg->setPosition({190.f, 135.f});
+        listBg->setPosition({200.f, 22.f + LIST_H / 2.f});
         m_mainLayer->addChild(listBg);
 
         m_scroll = ScrollLayer::create({LIST_W, LIST_H});
-        m_scroll->setPosition({25.f, 55.f});
+        m_scroll->setPosition({25.f, 22.f});
         m_scroll->m_contentLayer->setLayout(ScrollLayer::createDefaultListLayout(4.f));
         m_mainLayer->addChild(m_scroll);
 
         m_status = CCLabelBMFont::create("Loading versions...", "bigFont.fnt");
         m_status->setScale(0.45f);
-        m_status->setPosition({190.f, 135.f});
+        m_status->setPosition({200.f, 22.f + LIST_H / 2.f});
         m_mainLayer->addChild(m_status, 5);
 
         auto retrySpr = ButtonSprite::create("Retry");
@@ -911,40 +1032,18 @@ protected:
         m_retryBtn->setVisible(false);
         m_buttonMenu->addChildAtPosition(m_retryBtn, Anchor::Center, ccp(0.f, -35.f));
 
-        this->buildLegend();
+        auto channel = CCLabelBMFont::create(
+            fmt::format("Channel: {}", isDevChannel() ? "Dev-beta" : "Main").c_str(),
+            "chatFont.fnt"
+        );
+        channel->setScale(0.5f);
+        channel->setOpacity(160);
+        channel->setPosition({200.f, 11.f});
+        m_mainLayer->addChild(channel);
+
         this->load(false);
 
         return true;
-    }
-
-    void buildLegend() {
-        struct Entry {
-            char const* frame;
-            char const* text;
-            float x;
-        };
-
-        Entry const entries[] = {
-            {"geode.loader/info-alert.png", "Compatibility info", 28.f},
-            {"GJ_downloadBtn_001.png", "Install version", 160.f},
-            {"GJ_completesIcon_001.png", "Installed", 275.f},
-        };
-
-        for (auto const& entry : entries) {
-            auto icon = CCSprite::createWithSpriteFrameName(entry.frame);
-            if (icon) {
-                fitHeight(icon, 16.f);
-                icon->setPosition({entry.x, 30.f});
-                m_mainLayer->addChild(icon);
-            }
-
-            auto label = CCLabelBMFont::create(entry.text, "chatFont.fnt");
-            label->setScale(0.5f);
-            label->setOpacity(190);
-            label->setAnchorPoint({0.f, 0.5f});
-            label->setPosition({entry.x + 14.f, 30.f});
-            m_mainLayer->addChild(label);
-        }
     }
 
     void load(bool force) {
@@ -978,7 +1077,8 @@ protected:
             if (!channelAccepts(release))
                 continue;
 
-            m_scroll->m_contentLayer->addChild(this->makeRow(release));
+            // releases đã sắp xếp mới -> cũ, nên bản đầu tiên hiển thị là Latest.
+            m_scroll->m_contentLayer->addChild(this->makeRow(release, shown == 0));
             ++shown;
         }
 
@@ -994,7 +1094,7 @@ protected:
         m_scroll->scrollToTop();
     }
 
-    CCNode* makeRow(ReleaseInfo const& release) {
+    CCNode* makeRow(ReleaseInfo const& release, bool isLatest) {
         auto current = Mod::get()->getVersion();
         bool isCurrent = release.version == current;
 
@@ -1008,79 +1108,90 @@ protected:
         bg->setPosition({LIST_W / 2.f, ROW_H / 2.f});
         row->addChild(bg);
 
-        auto name = CCLabelBMFont::create(release.version.toVString().c_str(), "bigFont.fnt");
-        name->setScale(0.5f);
+        // Số phiên bản (xanh nếu là bản đang chạy)
+        auto name = CCLabelBMFont::create(
+            release.version.toVString().c_str(),
+            "bigFont.fnt"
+        );
+        name->setScale(0.55f);
+        name->setColor(isCurrent ? ccColor3B{120, 255, 120} : ccColor3B{255, 255, 255});
         name->setAnchorPoint({0.f, 0.5f});
-        name->setPosition({12.f, ROW_H / 2.f});
+        name->setPosition({12.f, ROW_H * 0.66f});
         row->addChild(name);
+
+        // Dòng phụ: kênh + ngày phát hành
+        auto sub = CCLabelBMFont::create(
+            fmt::format(
+                "{}{}",
+                release.prerelease ? "Dev-beta" : "Stable",
+                release.publishedAt.empty() ? "" : "  |  " + release.publishedAt
+            ).c_str(),
+            "chatFont.fnt"
+        );
+        sub->setScale(0.55f);
+        sub->setOpacity(190);
+        sub->setAnchorPoint({0.f, 0.5f});
+        sub->setPosition({12.f, ROW_H * 0.28f});
+        row->addChild(sub);
+
+        // Nhãn LATEST / CURRENT
+        if (isLatest) {
+            auto label = CCLabelBMFont::create("LATEST", "bigFont.fnt");
+            label->setScale(0.38f);
+            label->setColor({255, 200, 50});
+            label->setAnchorPoint({0.f, 0.5f});
+            label->setPosition({112.f, ROW_H * 0.66f});
+            row->addChild(label);
+        }
+
+        if (isCurrent) {
+            auto label = CCLabelBMFont::create("CURRENT", "bigFont.fnt");
+            label->setScale(0.38f);
+            label->setColor({120, 255, 120});
+            label->setAnchorPoint({0.f, 0.5f});
+            label->setPosition({172.f, ROW_H * 0.66f});
+            row->addChild(label);
+        }
 
         auto menu = CCMenu::create();
         menu->setContentSize({LIST_W, ROW_H});
         menu->setPosition({0.f, 0.f});
         row->addChild(menu);
 
-        // [!] compatibility
-        if (auto alertBtn = makeIconButton(
-                "geode.loader/info-alert.png",
-                22.f,
-                [release](CCMenuItemSpriteExtra*) { showCompat(release); }
+        // Nút info (chấm tròn xanh "i") -> mở popup changelog
+        if (auto infoBtn = makeIconButton(
+                "GJ_infoIcon_001.png",
+                24.f,
+                [release](CCMenuItemSpriteExtra*) { ChangelogPopup::open(release); }
             )) {
-            auto level = compatOf(release);
-            if (auto image = typeinfo_cast<CCRGBAProtocol*>(alertBtn->getNormalImage())) {
-                if (level == Compat::Danger)
-                    image->setColor(cocos2d::ccColor3B{255, 90, 90});
-                else if (level == Compat::Note)
-                    image->setColor(cocos2d::ccColor3B{190, 190, 190});
+            if (compatOf(release) == Compat::Danger) {
+                if (auto image = typeinfo_cast<CCRGBAProtocol*>(infoBtn->getNormalImage()))
+                    image->setColor(ccColor3B{255, 120, 120});
             }
 
-            alertBtn->setPosition({112.f, ROW_H / 2.f});
-            menu->addChild(alertBtn);
+            infoBtn->setPosition({292.f, ROW_H / 2.f});
+            menu->addChild(infoBtn);
         }
 
-        if (release.prerelease) {
-            auto beta = CCLabelBMFont::create("BETA", "bigFont.fnt");
-            beta->setScale(0.3f);
-            beta->setColor({255, 170, 60});
-            beta->setAnchorPoint({0.f, 0.5f});
-            beta->setPosition({130.f, ROW_H / 2.f});
-            row->addChild(beta);
-        }
-
-        // Bên phải: CURRENT / nút tải / không có file
-        if (isCurrent) {
-            auto label = CCLabelBMFont::create("CURRENT", "bigFont.fnt");
-            label->setScale(0.38f);
-            label->setColor({140, 255, 140});
-            label->setAnchorPoint({1.f, 0.5f});
-            label->setPosition({LIST_W - 12.f, ROW_H / 2.f});
-            row->addChild(label);
-
-            if (auto check = CCSprite::createWithSpriteFrameName("GJ_completesIcon_001.png")) {
-                fitHeight(check, 20.f);
-                check->setPosition({
-                    LIST_W - 12.f - label->getScaledContentSize().width - 14.f,
-                    ROW_H / 2.f
-                });
-                row->addChild(check);
+        // Nút tải xuống (không hiện cho bản đang chạy hoặc bản không có file .geode)
+        if (!isCurrent) {
+            if (!release.downloadUrl.empty()) {
+                if (auto downloadBtn = makeIconButton(
+                        "GJ_downloadBtn_001.png",
+                        28.f,
+                        [release](CCMenuItemSpriteExtra*) { confirmInstall(release); }
+                    )) {
+                    downloadBtn->setPosition({326.f, ROW_H / 2.f});
+                    menu->addChild(downloadBtn);
+                }
             }
-        }
-        else if (!release.downloadUrl.empty()) {
-            if (auto downloadBtn = makeIconButton(
-                    "GJ_downloadBtn_001.png",
-                    26.f,
-                    [release](CCMenuItemSpriteExtra*) { confirmInstall(release); }
-                )) {
-                downloadBtn->setPosition({LIST_W - 28.f, ROW_H / 2.f});
-                menu->addChild(downloadBtn);
+            else {
+                auto label = CCLabelBMFont::create("NO FILE", "bigFont.fnt");
+                label->setScale(0.28f);
+                label->setOpacity(130);
+                label->setPosition({326.f, ROW_H / 2.f});
+                row->addChild(label);
             }
-        }
-        else {
-            auto label = CCLabelBMFont::create("NO FILE", "bigFont.fnt");
-            label->setScale(0.3f);
-            label->setOpacity(130);
-            label->setAnchorPoint({1.f, 0.5f});
-            label->setPosition({LIST_W - 12.f, ROW_H / 2.f});
-            row->addChild(label);
         }
 
         return row;
@@ -1106,6 +1217,14 @@ public:
 };
 
 } // namespace
+
+
+/*
+ * Mở Version Manager từ bên ngoài (nút "Downgrade DLL Bot" trong button_setting.cpp).
+ */
+void openVersionManager() {
+    VersionListPopup::open();
+}
 
 
 /*
@@ -1183,10 +1302,13 @@ VersionManagerSettingV3::createNode(
 /*
  * Version Manager Node
  *
- *  [ Current v3.0.1  |  update info ]        [update] [download] [gear]
- *   - update   : kiểm tra bản mới (luôn báo kết quả)
+ *  [ White Bot v3.1.0  |  update info ]        [check] [download] [gear]
+ *   - check    : kiểm tra bản mới (luôn báo kết quả)
  *   - download : chỉ hiện khi đã biết có bản mới, tải bản đó
  *   - gear     : mở danh sách version để downgrade / cài bản bất kỳ
+ *
+ *  Các nút nằm trong menu riêng, vị trí đặt tay sát mép phải (layoutButtons),
+ *  không phụ thuộc layout của getButtonMenu().
  */
 
 bool VersionManagerSettingNodeV3::init(
@@ -1201,9 +1323,13 @@ bool VersionManagerSettingNodeV3::init(
     m_infoLabel->setPosition({12.f, this->getContentHeight() / 2.f});
     this->addChild(m_infoLabel);
 
-    auto menu = this->getButtonMenu();
+    m_menu = CCMenu::create();
+    m_menu->setAnchorPoint({0.f, 0.f});
+    m_menu->setPosition({0.f, 0.f});
+    m_menu->setContentSize(this->getContentSize());
+    this->addChild(m_menu);
 
-    auto checkButton = makeIconButton(
+    m_checkBtn = makeIconButton(
         "GJ_updateBtn_001.png",
         26.f,
         [this](CCMenuItemSpriteExtra*) { this->onCheckUpdate(nullptr); }
@@ -1215,23 +1341,39 @@ bool VersionManagerSettingNodeV3::init(
         [this](CCMenuItemSpriteExtra*) { this->onDownloadUpdate(nullptr); }
     );
 
-    auto gearButton = makeIconButton(
+    m_gearBtn = makeIconButton(
         "GJ_optionsBtn_001.png",
         26.f,
         [this](CCMenuItemSpriteExtra*) { this->onOpenVersions(nullptr); }
     );
 
-    if (!checkButton || !m_downloadBtn || !gearButton)
+    if (!m_checkBtn || !m_downloadBtn || !m_gearBtn)
         return false;
 
-    menu->addChild(checkButton);
-    menu->addChild(m_downloadBtn);
-    menu->addChild(gearButton);
+    m_menu->addChild(m_checkBtn);
+    m_menu->addChild(m_downloadBtn);
+    m_menu->addChild(m_gearBtn);
 
     this->refreshStatus();
     this->updateState(nullptr);
 
     return true;
+}
+
+
+// Xếp các nút đang hiện từ mép phải sang trái: gear, download (nếu có), check.
+void VersionManagerSettingNodeV3::layoutButtons() {
+    float x = this->getContentWidth() - 38.f;
+    float const y = this->getContentHeight() / 2.f;
+    float const gap = 36.f;
+
+    for (auto btn : {m_gearBtn, m_downloadBtn, m_checkBtn}) {
+        if (!btn || !btn->isVisible())
+            continue;
+
+        btn->setPosition({x, y});
+        x -= gap;
+    }
 }
 
 
@@ -1261,8 +1403,7 @@ void VersionManagerSettingNodeV3::refreshStatus() {
     if (m_downloadBtn)
         m_downloadBtn->setVisible(s_knownUpdate.has_value());
 
-    if (auto menu = this->getButtonMenu())
-        menu->updateLayout();
+    this->layoutButtons();
 }
 
 
