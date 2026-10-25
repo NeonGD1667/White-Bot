@@ -40,6 +40,12 @@
                 "Dev-beta"
             ]
         },
+        "check_updates_on_startup": {
+            "name": "Check Updates On Startup",
+            "description": "Checks for a new White Bot version when the game starts.",
+            "type": "bool",
+            "default": true
+        },
         "version-manager": {
             "type": "custom:version-manager",
             "name": ""
