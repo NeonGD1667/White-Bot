@@ -1,10 +1,30 @@
 # DLL Bot - White Bot
 
-## v3.1.0 
+## v3.1.0
 
-## Fixed
-- Fix FMOD_RESULT in IOS Build
-- Fix SDK taget
+### Added
+
+- Added iOS support.
+- Added Macro Index (about 90% complete, not fully tested yet).
+- Added "Check Updates On Startup" setting.
+- Added a changelog window (with an Install button) for every version in the Version Manager.
+
+### Improved
+
+- Upgraded Geode SDK from 5.9.0 to 5.11.2.
+- Rendering on Windows and macOS is now about twice as fast.
+- Redesigned the Version Manager: it now shows the channel, release date, and Latest / Current labels, with an info button for each version.
+- Aligned the Settings buttons (Open Menu, Downgrade, update controls) with the rest of the settings.
+
+### Fixed
+
+- Fixed the Downgrade button not opening anything.
+- Fixed FMOD_RESULT in iOS build.
+- Fixed SDK target.
+
+> Still supports Geometry Dash 2.2081 only. 2.2091 is not supported yet.
+
+---
 
 ## v3.0.1 — Pre-release
 
