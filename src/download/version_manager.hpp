@@ -38,6 +38,10 @@ struct DownloadResult {
     std::vector<std::string> warnings;  // cảnh báo tương thích (Geode / GD version)
 };
 
+// Mở popup Version Manager (danh sách version + changelog + cài đặt).
+// Dùng cho nút "Downgrade DLL Bot" trong button_setting.cpp.
+void openVersionManager();
+
 class UpdaterClient {
 public:
     using ListCallback = std::function<void(ReleaseListResult const&)>;
@@ -82,7 +86,10 @@ public:
 
 class VersionManagerSettingNodeV3 : public geode::SettingNodeV3 {
 protected:
+    cocos2d::CCMenu* m_menu = nullptr;
+    CCMenuItemSpriteExtra* m_checkBtn = nullptr;
     CCMenuItemSpriteExtra* m_downloadBtn = nullptr;
+    CCMenuItemSpriteExtra* m_gearBtn = nullptr;
     cocos2d::CCLabelBMFont* m_infoLabel = nullptr;
 
     bool init(
@@ -98,6 +105,9 @@ protected:
 
     void onCommit() override;
     void onResetToDefault() override;
+
+    // Đặt các nút sát mép phải, thẳng hàng giữa dòng.
+    void layoutButtons();
 
 public:
     static VersionManagerSettingNodeV3* create(
