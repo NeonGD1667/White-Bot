@@ -8,7 +8,7 @@
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused"
-#include "formats/v3/section.hpp"
+#include "section.hpp"
 #pragma GCC diagnostic pop
 
 #include "util.hpp"

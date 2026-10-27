@@ -1,8 +1,8 @@
 #ifndef _SLC_V3_BUILTIN_HPP
 #define _SLC_V3_BUILTIN_HPP
 
-#include "formats/v3/atom.hpp"
-#include "formats/v3/section.hpp"
+#include "atom.hpp"
+#include "section.hpp"
 #include "util.hpp"
 
 SLC_NS_BEGIN
