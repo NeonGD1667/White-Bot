@@ -1,7 +1,7 @@
 #ifndef SLC_FORMATS_V2_HPP
 #define SLC_FORMATS_V2_HPP
 
-#include "util.hpp"
+#include "../util.hpp"
 
 #include <cstring>
 #include <expected>
