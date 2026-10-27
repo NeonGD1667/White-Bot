@@ -2,7 +2,7 @@
 #define _SLC_V3_ATOM_HPP
 
 #include "error.hpp"
-#include "util.hpp"
+#include "../../util.hpp"
 
 #include <array>
 #include <concepts>

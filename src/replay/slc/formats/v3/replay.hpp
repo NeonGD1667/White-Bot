@@ -11,7 +11,7 @@
 #include "section.hpp"
 #pragma GCC diagnostic pop
 
-#include "util.hpp"
+#include "../../util.hpp"
 
 #include <array>
 #include <cassert>

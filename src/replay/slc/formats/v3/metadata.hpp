@@ -1,7 +1,7 @@
 #ifndef _SLC_V3_METADATA_HPP
 #define _SLC_V3_METADATA_HPP
 
-#include "util.hpp"
+#include "../../util.hpp"
 
 #include <expected>
 #include <string>
