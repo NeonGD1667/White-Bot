@@ -1,0 +1,45 @@
+cmake_minimum_required(VERSION 3.20)
+project(gdr_unified LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)            # C++20 is the minimum; White Bot builds with 23
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Standalone build of src/replay. No external dependency: nlohmann/json is the vendored replay/json.hpp.
+add_library(gdr STATIC replay/gdr.cpp replay/gdr.hpp replay/gdr_wb_adapter.hpp)
+target_include_directories(gdr PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/replay)
+if(MSVC)
+  target_compile_options(gdr PRIVATE /W4 /permissive-)
+else()
+  target_compile_options(gdr PRIVATE -Wall -Wextra)
+endif()
+
+option(GDR_BUILD_TESTS "build tests, benchmark and example" ON)
+if(GDR_BUILD_TESTS)
+  enable_testing()
+  foreach(t gdr_tests gdr_bench)
+    add_executable(${t} tests/${t}.cpp)
+    target_link_libraries(${t} PRIVATE gdr)
+  endforeach()
+  add_test(NAME gdr_tests COMMAND gdr_tests)
+  add_executable(gdr2_to_wbr examples/gdr2_to_wbr.cpp)
+  target_link_libraries(gdr2_to_wbr PRIVATE gdr)
+
+  # Adapter against the real old White Bot model (replay/legacy), Geode/cocos2d stubbed
+  add_executable(gdr_adapter_check tests/gdr_adapter_check.cpp replay/legacy/legacy_gdr.cpp)
+  target_include_directories(gdr_adapter_check PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/oracles/stubs)
+  target_link_libraries(gdr_adapter_check PRIVATE gdr)
+  add_test(NAME gdr_adapter_check COMMAND gdr_adapter_check)
+
+  # Differential tests against the ORIGINAL sources (optional; need a checkout of both repos)
+  set(GDR2_REFERENCE_DIR "" CACHE PATH "checkout of maxnut/GDReplayFormat, branch gdr2")
+  set(WHITEBOT_DIR "" CACHE PATH "checkout of NeonGD1667/White-Bot (tag v3.1.1, ORIGINAL src/gdr)")
+  if(GDR2_REFERENCE_DIR AND WHITEBOT_DIR)
+    add_executable(oracle_ref2 oracles/oracle_ref2.cpp)
+    target_include_directories(oracle_ref2 PRIVATE ${GDR2_REFERENCE_DIR}/include)
+    add_executable(oracle_wb_legacy oracles/oracle_wb_legacy.cpp ${WHITEBOT_DIR}/src/gdr/gdr.cpp)
+    target_include_directories(oracle_wb_legacy PRIVATE oracles/stubs ${WHITEBOT_DIR}/src/gdr)
+    add_executable(gdr_diff_tests tests/gdr_diff_tests.cpp)
+    target_link_libraries(gdr_diff_tests PRIVATE gdr)
+    add_test(NAME gdr_diff_tests COMMAND gdr_diff_tests $<TARGET_FILE:oracle_wb_legacy> $<TARGET_FILE:oracle_ref2>)
+  endif()
+endif()
