@@ -1,6 +1,6 @@
 #pragma once
 
-#include "gdr/gdr.hpp"
+#include "replay/gdr.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -10,7 +10,7 @@
 #include <vector>
 
 #define SLC_NO_DEFAULT
-#include "gdr/slc/slc.hpp"
+#include "replay/slc/slc.hpp"
 
 using namespace geode::prelude;
 

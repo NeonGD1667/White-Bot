@@ -13,7 +13,7 @@
 #include <cmath>
 
 #define SLC_NO_DEFAULT
-#include "gdr/slc/slc.hpp"
+#include "replay/slc/slc.hpp"
 
 #include <Geode/modify/PlayLayer.hpp>
 
