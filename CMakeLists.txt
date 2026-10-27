@@ -29,7 +29,7 @@ add_library(${PROJECT_NAME} SHARED
     src/macro.cpp
     src/keybinds.cpp
     src/utils/utils.cpp
-    src/gdr/gdr.cpp
+    src/replay/gdr.cpp
     src/renderer/renderer.cpp
     src/download/version_manager.cpp
 
