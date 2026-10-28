@@ -318,7 +318,7 @@ void Global::frameStepBackward(int amount) {
 
     auto &fixes = g.macro.frameFixes;
     fixes.erase(std::remove_if(fixes.begin(), fixes.end(),
-                               [newFrame](const gdr::FrameFix &fix) {
+                                [newFrame](const wbleg::FrameFix &fix) {
                                  return fix.frame > newFrame;
                                }),
                 fixes.end());

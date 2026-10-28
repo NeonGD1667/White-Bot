@@ -602,7 +602,7 @@ class $modify(BGLHook, GJBaseGameLayer) {
                 std::remove_if(
                     fixes.begin(),
                     fixes.end(),
-                    [targetFrame](const gdr::FrameFix& fix) {
+                    [targetFrame](const wbleg::FrameFix& fix) {
                         return fix.frame > targetFrame;
                     }
                 ),
