@@ -15,13 +15,13 @@
 ShowTrajectory &t = ShowTrajectory::get();
 
 namespace {
-std::optional<gdr::FrameData> sampleGhostFrame(
-    std::vector<gdr::FrameFix> const &fixes, int frame, bool player2) {
+std::optional<wbleg::FrameData> sampleGhostFrame(
+    std::vector<wbleg::FrameFix> const &fixes, int frame, bool player2) {
   if (fixes.empty())
     return std::nullopt;
 
-  gdr::FrameFix const *previous = nullptr;
-  gdr::FrameFix const *next = nullptr;
+  wbleg::FrameFix const *previous = nullptr;
+  wbleg::FrameFix const *next = nullptr;
 
   for (auto const &fix : fixes) {
     if (fix.frame <= frame)
@@ -37,11 +37,11 @@ std::optional<gdr::FrameData> sampleGhostFrame(
   if (!next)
     next = &fixes.back();
 
-  auto getData = [player2](gdr::FrameFix const *fix) -> gdr::FrameData const & {
+  auto getData = [player2](wbleg::FrameFix const *fix) -> wbleg::FrameData const & {
     return player2 ? fix->p2 : fix->p1;
   };
 
-  gdr::FrameData data = getData(previous);
+  wbleg::FrameData data = getData(previous);
   auto const &nextData = getData(next);
 
   if (previous == next || next->frame <= previous->frame)
