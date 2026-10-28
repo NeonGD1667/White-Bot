@@ -1,6 +1,10 @@
 #pragma once
 
+// Old GDR1 replay model (namespace wbleg) that Macro still derives from, plus the global WhiteBotVersion.
+#include "replay/legacy/legacy_gdr.hpp"
+// Unified replay library: GDR1 / GDR2 / WBR codecs (namespace gdr).
 #include "replay/gdr.hpp"
+#include "replay/gdr_wb_adapter.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -29,7 +33,7 @@ enum state {
     playing
 };
 
-struct input : gdr::Input {
+struct input : wbleg::Input {
     input() = default;
 
     input(
@@ -48,7 +52,7 @@ struct input : gdr::Input {
     }
 };
 
-struct Macro : gdr::Replay<Macro, input> {
+struct Macro : wbleg::Replay<Macro, input> {
     Macro() : Replay("White Bot", WhiteBotVersion.c_str()) {}
 
     bool canChangeFPS = true;
@@ -67,6 +71,27 @@ struct Macro : gdr::Replay<Macro, input> {
         int frame,
         PlayerObject* p1,
         PlayerObject* p2
+    );
+
+    // Serialization entry points. These HIDE the same-named members of wbleg::Replay (same signatures, same
+    // call sites) and are implemented on top of the unified gdr:: library, so they accept GDR1 (MessagePack /
+    // JSON), GDR2 and WBR data and detect the format from the content.
+    // On failure importData returns a default Macro, exactly like the old implementation; use tryImport() to get
+    // the reason.
+    static Macro importData(
+        std::vector<std::uint8_t> const& data,
+        bool importInputs = true
+    );
+
+    static std::optional<Macro> tryImport(
+        std::vector<std::uint8_t> const& data,
+        std::string* error = nullptr,
+        bool importInputs = true
+    );
+
+    // json == true -> GDR1 JSON text, false -> GDR1 MessagePack. Returns an empty vector on failure.
+    std::vector<std::uint8_t> exportData(
+        bool exportJson = false
     );
 
     // Legacy GDR
@@ -108,6 +133,15 @@ struct Macro : gdr::Replay<Macro, input> {
     );
 
     std::vector<std::uint8_t> exportGDR2();
+
+    // WBR (new White Bot replay format, see replay/gdr.hpp)
+    static int saveWBR(
+        std::string author,
+        std::string desc,
+        std::string path
+    );
+
+    std::vector<std::uint8_t> exportWBR();
 
     // SLC2
     static int saveSLC2(

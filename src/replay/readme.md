@@ -158,37 +158,14 @@ Kết luận trung thực: so với GDR1, WBR nhỏ hơn **~7× (MsgPack) / ~13�
 
 | File | Sửa |
 |---|---|
-| `macro.hpp` dòng 3 | `#include "gdr/gdr.hpp"` → `#include "replay/legacy/legacy_gdr.hpp"` và thêm `#include "replay/gdr_wb_adapter.hpp"` |
-| `macro.hpp` dòng 13, `macro.cpp` dòng 16 | `"gdr/slc/slc.hpp"` → `"replay/slc/slc.hpp"` |
-| `macro.hpp` dòng 32, 51 | `gdr::Input`, `gdr::Replay<Macro, input>` → `wbleg::...` |
-| `macro.cpp` dòng 804, 942, 1664 | `gdr::Replay<Macro, input>&` → `wbleg::Replay<Macro, input>&` (và `#include "replay/gdr.hpp"` ở đầu file) |
+| `macro.hpp`, `macro.cpp` | **thay nguyên file** bằng `macro/macro.hpp`, `macro/macro.cpp` |
 | `hacks/show_trajectory.cpp` | 6 chỗ `gdr::FrameData` / `gdr::FrameFix` → `wbleg::` |
 | `global.cpp` dòng 321, `main.cpp` dòng 605 | `gdr::FrameFix` → `wbleg::FrameFix` |
 | `CMakeLists.txt` dòng 32 | `src/gdr/gdr.cpp` → `src/replay/gdr.cpp` và `src/replay/legacy/legacy_gdr.cpp` (+ đổi đường dẫn nếu `slc` có file `.cpp`) |
 
    Đây chỉ là đổi tên: `Macro` và hàng trăm chỗ dùng `macro.inputs` / `macro.frameFixes` giữ nguyên.
-3. **Thay thân các hàm** (chữ ký giữ nguyên nên call site không đổi):
-```cpp
-// trước: Macro::importData(data)  /  macro.exportData(json)
-std::optional<Macro> Macro::load(std::span<const uint8_t> data, gdr::Report* rep = nullptr) {
-    gdr::ImportOptions o; o.report = rep;
-    auto r = gdr::importReplay(data, o);                       // tự nhận GDR1/GDR2/WBR
-    if (!r) { geode::log::error("{}", r.error().toString()); return std::nullopt; }
-    Macro m; bool plat = false;
-    if (!gdr::wb::fromReplay(static_cast<wbleg::Replay<Macro, input>&>(m), r.value(), &plat)) return std::nullopt;
-    m.platformer = plat;
-    m.seed = static_cast<uintptr_t>(static_cast<uint32_t>(r.value().seed));   // Macro::seed che seed của Replay
-    return m;
-}
-std::vector<uint8_t> Macro::dump(gdr::Format f) const {
-    auto r = gdr::wb::toReplay(static_cast<const wbleg::Replay<Macro, input>&>(*this), platformer);
-    gdr::ExportOptions o; o.format = f;                        // Gdr1MsgPack = file .gdr hiện tại
-    auto b = gdr::exportReplay(r, o);
-    return b ? std::move(b.value()) : std::vector<uint8_t>{};
-}
-```
-   `isGDR2Data(d)` → `gdr::detectFormat(d).format == gdr::Format::Gdr2`; `importGDR2`/`exportGDR2`/`saveGDR2` → `load`/`dump(Format::Gdr2)`; `exportData(true)` → `Format::Gdr1Json`; `exportData(false)` → `Format::Gdr1MsgPack`. Lưu `.wbr`: `dump(Format::Wbr)`.
-4. **Quy tắc đã đổi cần biết**: lưu GDR2 giờ có block `WBX1` (vài chục byte) với bot `White Bot`; `LossPolicy::Error` sẽ trả lỗi thay vì âm thầm bỏ dữ liệu, WB nên hiển thị `error.message`.
+3. **Thay `macro.hpp` và `macro.cpp`** bằng hai file trong `macro/` (đã viết sẵn, xem §10). Không cần tự sửa thân hàm nào nữa.
+4. **Quy tắc đã đổi cần biết**: lưu GDR2 giờ có block `WBX1` (vài chục byte) với bot `White Bot`; lưu `.gdr`/`.gdr2` dùng `LossPolicy::ReportAndDrop` (không chặn việc lưu, mọi thứ bị bỏ được ghi vào log Geode).
 5. **HLR**: khi có spec, viết `class HlrCodec : public gdr::ICodec` rồi `gdr::registerCodec(...)`; `Replay` và các codec khác không phải sửa (đã có test với codec giả).
 
 ## 8. Chưa xác minh / giới hạn
@@ -210,3 +187,21 @@ cmake --build build && (cd build && ctest --output-on-failure)     # gdr_tests, 
 # sanitizer:  g++ -std=c++23 -O1 -g -fsanitize=address,undefined -Ireplay replay/gdr.cpp tests/gdr_tests.cpp
 # benchmark:  build/gdr_bench <inputs> <fixes> {gdr2|gdr2wbx|json|msgpack|wbr}
 ```
+
+## 10. `macro.hpp` / `macro.cpp` viết lại (thư mục `macro/`)
+
+**Quan hệ giữa các lớp (đọc từ source v3.1.1):** `Macro` kế thừa `wbleg::Replay<Macro, input>` (model GDR1 cũ, CRTP; `input : wbleg::Input`). Model mới `gdr::Replay` là struct thường, không phải template, nên **không thể** thay thế chỗ kế thừa mà không viết lại hàng trăm chỗ dùng `macro.inputs` / `macro.frameFixes`. Vì vậy `Macro` giữ model cũ (đổi tên namespace) và chỉ phần đọc/ghi file chuyển sang thư viện mới qua `gdr::wb::toReplay/fromReplay`. SLC2/SLC3 và XD không đổi.
+
+**`WhiteBotVersion`** vẫn là `const std::string` toàn cục ở `legacy_gdr.hpp` (đúng như cũ: `"v3.1.0-Neon"`); `macro.hpp` include file đó nên `Macro()`, `macro.cpp:390` và `ui/record_layer.cpp:1085` dùng được nguyên xi. Lưu ý: giá trị này vẫn là `v3.1.0-Neon` dù repo là v3.1.1, tôi không đổi.
+
+**API công khai giữ nguyên chữ ký:** `Macro::importData(data, importInputs=true)`, `exportData(json=false)`, `isGDR2Data`, `importGDR2`, `exportGDR2`, `save`, `saveGDR2`, mọi hàm SLC/XD, `ui/load_macro_layer.cpp` và `ui/macro_cell.cpp` không phải sửa. `importData`/`exportData` giờ là hàm của `Macro` (che hàm cùng tên của lớp cha) và `importData` tự nhận GDR1/GDR2/WBR theo nội dung. Thêm mới: `tryImport()` (trả lý do lỗi), `exportWBR()`, `saveWBR()` (chưa nối vào UI), mã lỗi lưu `22` = serialize thất bại.
+
+**Khác với v3.1.1 (cố ý, đã kiểm tra):**
+* `exportGDR2` cũ ghi `gameVersion = static_cast<int>(2.2081f) = 2`; giờ ghi `22081`. Macro chuyển từ `Macro::gameVersion` theo cả hai quy ước (`2.2081` khi ghi âm, `22081` khi nhập từ XD/GDR2).
+* Seed: `importData` cũ gán vào `Macro::seed` (do member che), còn `exportData` ghi `seed` của lớp cha (luôn 0) nên **seed bị mất mỗi lần lưu lại**. Giờ cả hai được đặt và seed được giữ.
+* GDR2 lưu thêm `FrameFix`, `lastRecordedFrame`, chuỗi version trong block `WBX1` (cũ: bỏ hết, version `v3.1.0-Neon` thành `0`).
+* Lưu lại macro `Dll Bot` cũ không còn dịch thêm +1 frame mỗi lần.
+* File hỏng như `{"inputs":[{"frame":1}]}` làm bản cũ crash; bản mới trả `Macro` rỗng (giống hành vi "file không đọc được" cũ) và ghi lỗi vào log.
+* `isGDR2Data` dùng `gdr::detectFormat` (vẫn chỉ xét magic `GDR`).
+
+**Kiểm chứng (tests/macro_harness):** build hai harness từ *văn bản thật* của `macro.hpp` và khối GDR-IO của `macro.cpp` (cũ v3.1.1 và mới), stub Geode/cocos2d, rồi so sánh hành vi. Kết quả: 94 so sánh, 0 lỗi, gồm: byte ghi ra `.gdr`/`.gdr.json` **giống hệt** bản cũ (trừ khóa `platformer` bổ sung và macro Dll Bot cũ), hai bên đọc được file của nhau cho GDR1 và GDR2, import→export giống hệt, macro WBR qua `Macro` đọc lại đúng. **Chưa thể biên dịch toàn bộ `macro.cpp` vì thiếu Geode SDK**: phần ngoài khối GDR-IO chỉ có thay đổi đường dẫn include, một cast `wbleg::`, và hai dòng `return 22`.

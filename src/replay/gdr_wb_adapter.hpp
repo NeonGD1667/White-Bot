@@ -7,6 +7,7 @@
 #pragma once
 #include "gdr.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -20,7 +21,10 @@ Replay toReplay(const OldReplay& m, bool platformer = false) {
     r.author = m.author;
     r.description = m.description;
     r.duration = m.duration;
-    r.gameVersion = static_cast<std::int32_t>(std::llround(static_cast<double>(m.gameVersion) * 10000.0));
+    // White Bot stores the GD version in two conventions: 2.2081 (recorded macros, GDR1) and 22081 (XD / GDR2 imports).
+    // The model always uses the integer form 22081.
+    const double gv = static_cast<double>(m.gameVersion);
+    r.gameVersion = static_cast<std::int32_t>(std::llround(gv > 0.0 && gv < 100.0 ? gv * 10000.0 : gv));
     r.gdr1FormatVersion = m.version;
     r.framerate = m.framerate;
     r.seed = m.seed;
@@ -33,7 +37,7 @@ Replay toReplay(const OldReplay& m, bool platformer = false) {
     r.inputs.reserve(m.inputs.size());
     for (const auto& in : m.inputs) {
         Input x;
-        x.frame = static_cast<std::uint64_t>(in.frame);
+        x.frame = static_cast<std::uint64_t>((std::max<long long>)(in.frame, 0));   // old exportGDR2 clamped negatives to 0
         x.button = static_cast<std::uint8_t>(in.button);
         x.player2 = in.player2;
         x.down = in.down;
@@ -42,7 +46,7 @@ Replay toReplay(const OldReplay& m, bool platformer = false) {
     r.frameFixes.reserve(m.frameFixes.size());
     for (const auto& f : m.frameFixes) {
         FrameFix ff;
-        ff.frame = static_cast<std::uint64_t>(f.frame);
+        ff.frame = static_cast<std::uint64_t>((std::max<long long>)(f.frame, 0));
         ff.p1 = {{f.p1.pos.x, f.p1.pos.y}, f.p1.rotation, f.p1.rotate};
         ff.p2 = {{f.p2.pos.x, f.p2.pos.y}, f.p2.rotation, f.p2.rotate};
         r.frameFixes.push_back(ff);
@@ -58,7 +62,7 @@ bool fromReplay(OldReplay& m, const Replay& r, bool* platformerOut = nullptr) {
     m.author = r.author;
     m.description = r.description;
     m.duration = r.duration;
-    m.gameVersion = static_cast<float>(r.gameVersion) / 10000.f;
+    m.gameVersion = static_cast<float>(r.gameVersion) / 10000.f;   // GDR1 convention; callers may override (see Macro)
     m.version = static_cast<float>(r.gdr1FormatVersion);
     m.framerate = static_cast<float>(r.framerate);
     m.seed = r.seed;

@@ -17,168 +17,6 @@
 
 #include <Geode/modify/PlayLayer.hpp>
 
-namespace {
-
-class GDR2Reader {
-public:
-    explicit GDR2Reader(std::span<std::uint8_t const> data) : m_data(data) {}
-
-    bool empty() const { return m_data.empty(); }
-
-    bool readBytes(void* out, size_t size) {
-        if (size > m_data.size())
-            return false;
-        std::memcpy(out, m_data.data(), size);
-        m_data = m_data.subspan(size);
-        return true;
-    }
-
-    bool skip(size_t size) {
-        if (size > m_data.size())
-            return false;
-        m_data = m_data.subspan(size);
-        return true;
-    }
-
-    template <typename T>
-    bool readVarint(T& out) {
-        static_assert(std::is_integral_v<T>);
-        uint64_t value = 0;
-        int shift = 0;
-
-        while (true) {
-            if (m_data.empty() || shift > 63)
-                return false;
-
-            auto byte = m_data.front();
-            m_data = m_data.subspan(1);
-
-            value |= static_cast<uint64_t>(byte & 0x7F) << shift;
-
-            if ((byte & 0x80) == 0)
-                break;
-
-            shift += 7;
-        }
-
-        out = static_cast<T>(value);
-        return true;
-    }
-
-    template <typename T>
-    bool readBE(T& out) {
-        std::array<std::uint8_t, sizeof(T)> bytes{};
-
-        if (!readBytes(bytes.data(), bytes.size()))
-            return false;
-
-        if constexpr (std::endian::native == std::endian::little)
-            std::reverse(bytes.begin(), bytes.end());
-
-        std::memcpy(&out, bytes.data(), sizeof(T));
-        return true;
-    }
-
-    bool readBool(bool& out) {
-        uint8_t value = 0;
-
-        if (!readVarint(value))
-            return false;
-
-        out = value != 0;
-        return true;
-    }
-
-    bool readString(std::string& out) {
-        size_t size = 0;
-
-        if (!readVarint(size))
-            return false;
-
-        if (size > m_data.size())
-            return false;
-
-        out.assign(
-            reinterpret_cast<char const*>(m_data.data()),
-            size
-        );
-
-        m_data = m_data.subspan(size);
-        return true;
-    }
-
-private:
-    std::span<std::uint8_t const> m_data;
-};
-
-class GDR2Writer {
-public:
-    void writeBytes(const void* data, size_t size) {
-        auto const* bytes =
-            static_cast<std::uint8_t const*>(data);
-
-        m_data.insert(
-            m_data.end(),
-            bytes,
-            bytes + size
-        );
-    }
-
-    template <typename T>
-    void writeVarint(T value) {
-        static_assert(std::is_integral_v<T>);
-
-        uint64_t v = static_cast<uint64_t>(value);
-
-        do {
-            std::uint8_t byte =
-                static_cast<std::uint8_t>(v & 0x7F);
-
-            v >>= 7;
-
-            if (v != 0)
-                byte |= 0x80;
-
-            m_data.push_back(byte);
-        } while (v != 0);
-    }
-
-    template <typename T>
-    void writeBE(T value) {
-        std::array<std::uint8_t, sizeof(T)> bytes{};
-
-        std::memcpy(
-            bytes.data(),
-            &value,
-            sizeof(T)
-        );
-
-        if constexpr (std::endian::native == std::endian::little)
-            std::reverse(bytes.begin(), bytes.end());
-
-        writeBytes(bytes.data(), bytes.size());
-    }
-
-    void writeBool(bool value) {
-        writeVarint<std::uint8_t>(
-            value ? 1 : 0
-        );
-    }
-
-    void writeString(std::string const& value) {
-        writeVarint(value.size());
-        writeBytes(value.data(), value.size());
-    }
-
-    std::vector<std::uint8_t> const& data() const {
-        return m_data;
-    }
-
-private:
-    std::vector<std::uint8_t> m_data;
-};
-
-} // namespace
 
 void Macro::recordAction(
     int frame,
@@ -515,6 +353,9 @@ int Macro::save(
     auto data =
         g.macro.exportData(json);
 
+    if (data.empty())
+        return 22;
+
     f.write(
         reinterpret_cast<char const*>(
             data.data()
@@ -607,6 +448,9 @@ int Macro::saveGDR2(
 
     auto data =
         g.macro.exportGDR2();
+
+    if (data.empty())
+        return 22;
 
     f.write(
         reinterpret_cast<char const*>(
@@ -742,287 +586,331 @@ Macro Macro::XDtoGDR(
     return newMacro;
 }
 
+// ============================================================
+// GDR1 / GDR2 / WBR serialization (unified gdr:: library)
+//
+// Macro keeps deriving from the old model (wbleg::Replay) so that macro.inputs / macro.frameFixes keep working
+// everywhere. Reading and writing is delegated to the codecs in replay/gdr.cpp through gdr::wb::toReplay /
+// fromReplay (replay/gdr_wb_adapter.hpp). The format is detected from the content, never from the file name.
+// ============================================================
+// BEGIN GDR-IO
+
+namespace {
+
+using ReplayBase = wbleg::Replay<Macro, input>;
+
+void logReport(
+    char const* what,
+    gdr::Report const& report
+) {
+    for (auto const& d : report.items) {
+        if (d.severity == gdr::Severity::Warning)
+            log::warn("[{}] {}: {}", what, d.code, d.message);
+    }
+}
+
+// Macro -> unified model. The base-class view is used on purpose: Macro::seed (the live RNG seed, uintptr_t)
+// hides the 32-bit seed stored inside replays.
+gdr::Replay toModel(
+    Macro const& macro
+) {
+    return gdr::wb::toReplay(
+        static_cast<ReplayBase const&>(macro),
+        macro.platformer
+    );
+}
+
+bool isGdr1(
+    gdr::Format format
+) {
+    return format == gdr::Format::Gdr1MsgPack ||
+           format == gdr::Format::Gdr1Json;
+}
+
+// Unified model -> Macro. Reproduces what the old importers did per source format:
+//  - GDR1:        gameVersion is 2.2081, DllBotMacro / lastRecordedFrame come from the file only.
+//  - GDR2 / WBR:  gameVersion is kept as 22081 (old importGDR2 behaviour), DllBotMacro is derived from the bot
+//                 name and lastRecordedFrame falls back to the last input.
+//  - all:         Macro::seed receives the file seed.
+bool fromModel(
+    Macro& macro,
+    gdr::Replay const& replay
+) {
+    bool platformer = false;
+
+    if (!gdr::wb::fromReplay(
+            static_cast<ReplayBase&>(macro),
+            replay,
+            &platformer
+        ))
+        return false;
+
+    macro.platformer = platformer;
+
+    // The old GDR1 importer assigned the file seed to Macro::seed (the derived member hides the replay seed);
+    // the replay-level seed set by fromReplay() additionally keeps it when the macro is saved again.
+    macro.seed =
+        static_cast<uintptr_t>(replay.seed);
+
+    if (isGdr1(replay.source.format))
+        return true;
+
+    macro.gameVersion =
+        static_cast<float>(replay.gameVersion);
+
+    if (macro.lastRecordedFrame == 0 && !macro.inputs.empty())
+        macro.lastRecordedFrame =
+            macro.inputs.back().frame;
+
+    macro.DllBotMacro =
+        macro.botInfo.name == "Dll Bot";
+
+    return true;
+}
+
+std::optional<Macro> importWith(
+    std::vector<std::uint8_t> const& data,
+    gdr::Format format,
+    std::string* error,
+    bool importInputs
+) {
+    gdr::Report report;
+    gdr::ImportOptions options;
+
+    options.format = format;
+    options.metadataOnly = !importInputs;
+    options.report = &report;
+
+    auto replay = gdr::importReplay(data, options);
+
+    if (!replay) {
+        auto message = replay.error().toString();
+
+        log::error("Failed to import macro: {}", message);
+
+        if (error)
+            *error = std::move(message);
+
+        return std::nullopt;
+    }
+
+    logReport("import", report);
+
+    Macro macro;
+
+    if (!fromModel(macro, replay.value())) {
+        if (error)
+            *error = "macro contains a frame number that does not fit in an int";
+
+        return std::nullopt;
+    }
+
+    return macro;
+}
+
+std::vector<std::uint8_t> exportWith(
+    Macro const& macro,
+    gdr::Format format
+) {
+    gdr::Report report;
+    gdr::ExportOptions options;
+
+    options.format = format;
+    // Saving must not fail because a format cannot hold one field; whatever is dropped is logged.
+    options.lossPolicy = gdr::LossPolicy::ReportAndDrop;
+    options.report = &report;
+
+    auto bytes = gdr::exportReplay(
+        toModel(macro),
+        options
+    );
+
+    logReport("export", report);
+
+    if (!bytes) {
+        log::error(
+            "Failed to export macro: {}",
+            bytes.error().toString()
+        );
+
+        return {};
+    }
+
+    return std::move(bytes.value());
+}
+
+} // namespace
+
+Macro Macro::importData(
+    std::vector<std::uint8_t> const& data,
+    bool importInputs
+) {
+    // Same contract as the old wbleg::Replay::importData: an unreadable file yields a default Macro.
+    auto macro = importWith(
+        data,
+        gdr::Format::Auto,
+        nullptr,
+        importInputs
+    );
+
+    return macro ? std::move(*macro) : Macro();
+}
+
+std::optional<Macro> Macro::tryImport(
+    std::vector<std::uint8_t> const& data,
+    std::string* error,
+    bool importInputs
+) {
+    return importWith(
+        data,
+        gdr::Format::Auto,
+        error,
+        importInputs
+    );
+}
+
+std::vector<std::uint8_t> Macro::exportData(
+    bool exportJson
+) {
+    return exportWith(
+        *this,
+        exportJson
+            ? gdr::Format::Gdr1Json
+            : gdr::Format::Gdr1MsgPack
+    );
+}
+
 bool Macro::isGDR2Data(
     std::vector<std::uint8_t> const& data
 ) {
-    return data.size() >= 3 &&
-           data[0] == 'G' &&
-           data[1] == 'D' &&
-           data[2] == 'R';
+    return gdr::detectFormat(data).format ==
+           gdr::Format::Gdr2;
 }
 
 std::optional<Macro> Macro::importGDR2(
     std::vector<std::uint8_t> const& data
 ) {
-    if (!isGDR2Data(data))
-        return std::nullopt;
-
-    GDR2Reader reader(data);
-
-    char magic[3]{};
-
-    if (!reader.readBytes(
-        magic,
-        sizeof(magic)
-    ))
-        return std::nullopt;
-
-    uint64_t version = 0;
-
-    if (!reader.readVarint(version) ||
-        version != 2)
-        return std::nullopt;
-
-    Macro macro;
-    std::string inputTag;
-
-    int gameVersion = 0;
-    double framerate = 240.0;
-    int replaySeed = 0;
-
-    if (!reader.readString(inputTag) ||
-        !reader.readString(macro.author) ||
-        !reader.readString(macro.description) ||
-        !reader.readBE(macro.duration) ||
-        !reader.readVarint(gameVersion) ||
-        !reader.readBE(framerate) ||
-        !reader.readVarint(replaySeed) ||
-        !reader.readVarint(macro.coins) ||
-        !reader.readBool(macro.ldm))
-        return std::nullopt;
-
-    macro.gameVersion =
-        static_cast<float>(gameVersion);
-
-    macro.framerate =
-        static_cast<float>(framerate);
-
-    macro.seed =
-        static_cast<uintptr_t>(replaySeed);
-
-    static_cast<
-        gdr::Replay<Macro, input>&
-    >(macro).seed = replaySeed;
-
-    if (!reader.readBool(macro.platformer) ||
-        !reader.readString(macro.botInfo.name))
-        return std::nullopt;
-
-    int botVersion = 0;
-
-    if (!reader.readVarint(botVersion) ||
-        !reader.readVarint(macro.levelInfo.id) ||
-        !reader.readString(macro.levelInfo.name))
-        return std::nullopt;
-
-    macro.botInfo.version =
-        std::to_string(botVersion);
-
-    size_t extensionSize = 0;
-
-    if (!reader.readVarint(extensionSize) ||
-        !reader.skip(extensionSize))
-        return std::nullopt;
-
-    size_t deathCount = 0;
-
-    if (!reader.readVarint(deathCount))
-        return std::nullopt;
-
-    uint64_t deathFrame = 0;
-
-    for (size_t i = 0; i < deathCount; ++i) {
-        uint64_t delta = 0;
-
-        if (!reader.readVarint(delta))
-            return std::nullopt;
-
-        deathFrame += delta;
-    }
-
-    size_t inputCount = 0;
-    size_t p1InputCount = 0;
-
-    if (!reader.readVarint(inputCount) ||
-        !reader.readVarint(p1InputCount) ||
-        p1InputCount > inputCount)
-        return std::nullopt;
-
-    macro.inputs.reserve(inputCount);
-
-    uint64_t p1Frame = 0;
-    uint64_t p2Frame = 0;
-
-    bool hasInputExtensions =
-        !inputTag.empty();
-
-    for (size_t i = 0; i < inputCount; ++i) {
-        uint64_t packed = 0;
-
-        if (!reader.readVarint(packed))
-            return std::nullopt;
-
-        bool player2 =
-            i >= p1InputCount;
-
-        uint64_t& frameBase =
-            player2 ? p2Frame : p1Frame;
-
-        uint64_t delta =
-            macro.platformer
-                ? (packed >> 3)
-                : (packed >> 1);
-
-        int button =
-            macro.platformer
-                ? static_cast<int>(
-                    (packed >> 1) & 0b11
-                )
-                : 1;
-
-        bool down =
-            (packed & 1) != 0;
-
-        frameBase += delta;
-
-        macro.inputs.emplace_back(
-            static_cast<int>(frameBase),
-            button,
-            player2,
-            down
-        );
-
-        if (hasInputExtensions) {
-            size_t inputExtensionSize = 0;
-
-            if (!reader.readVarint(
-                    inputExtensionSize
-                ) ||
-                !reader.skip(
-                    inputExtensionSize
-                ))
-                return std::nullopt;
-        }
-    }
-
-    macro.lastRecordedFrame =
-        macro.inputs.empty()
-            ? 0
-            : macro.inputs.back().frame;
-
-    macro.DllBotMacro =
-        macro.botInfo.name == "Dll Bot";
-
-    return macro;
+    return importWith(
+        data,
+        gdr::Format::Gdr2,
+        nullptr,
+        true
+    );
 }
 
 std::vector<std::uint8_t>
 Macro::exportGDR2() {
-    GDR2Writer writer;
-
-    writer.writeBytes("GDR", 3);
-    writer.writeVarint<uint64_t>(2);
-
-    writer.writeString("");
-
-    writer.writeString(author);
-    writer.writeString(description);
-    writer.writeBE(duration);
-
-    writer.writeVarint(
-        static_cast<int>(gameVersion)
+    return exportWith(
+        *this,
+        gdr::Format::Gdr2
     );
-
-    writer.writeBE(
-        static_cast<double>(framerate)
-    );
-
-    int replaySeed =
-        static_cast<
-            gdr::Replay<Macro, input>&
-        >(*this).seed;
-
-    writer.writeVarint(replaySeed);
-    writer.writeVarint(coins);
-    writer.writeBool(ldm);
-    writer.writeBool(platformer);
-
-    writer.writeString(botInfo.name);
-
-    int botVersion = 0;
-
-    try {
-        botVersion =
-            std::stoi(botInfo.version);
-    }
-    catch (...) {
-        botVersion = 0;
-    }
-
-    writer.writeVarint(botVersion);
-    writer.writeVarint(levelInfo.id);
-    writer.writeString(levelInfo.name);
-
-    writer.writeVarint<size_t>(0);
-    writer.writeVarint<size_t>(0);
-
-    std::vector<input const*> p1Inputs;
-    std::vector<input const*> p2Inputs;
-
-    for (auto const& in : inputs) {
-        if (in.player2)
-            p2Inputs.push_back(&in);
-        else
-            p1Inputs.push_back(&in);
-    }
-
-    writer.writeVarint(inputs.size());
-    writer.writeVarint(p1Inputs.size());
-
-    auto writeGroup =
-        [&](std::vector<input const*> const& group) {
-            uint64_t prevFrame = 0;
-
-            for (auto const* in : group) {
-                uint64_t frame =
-                    static_cast<uint64_t>(
-                       std::max(static_cast<int>(in->frame), 0)
-                    );
-
-                uint64_t delta =
-                    frame - prevFrame;
-
-                prevFrame = frame;
-
-                uint64_t packed = 0;
-
-                if (platformer) {
-                    packed =
-                        (delta << 3) |
-                        (
-                            (
-                                static_cast<uint64_t>(
-                                    in->button
-                                ) & 0b11
-                            ) << 1
-                        ) |
-                        (in->down ? 1ull : 0ull);
-                }
-                else {
-                    packed =
-                        (delta << 1) |
-                        (in->down ? 1ull : 0ull);
-                }
-
-                writer.writeVarint(packed);
-            }
-        };
-
-    writeGroup(p1Inputs);
-    writeGroup(p2Inputs);
-
-    return writer.data();
 }
+
+std::vector<std::uint8_t>
+Macro::exportWBR() {
+    return exportWith(
+        *this,
+        gdr::Format::Wbr
+    );
+}
+
+int Macro::saveWBR(
+    std::string author,
+    std::string desc,
+    std::string path
+) {
+    auto& g = Global::get();
+
+    if (g.macro.inputs.empty())
+        return 31;
+
+    std::string extension = ".wbr";
+    int iterations = 0;
+
+    while (std::filesystem::exists(path + extension)) {
+        iterations++;
+
+        if (iterations > 1) {
+            int length =
+                3 +
+                static_cast<int>(
+                    std::to_string(iterations - 1).length()
+                );
+
+            path.erase(
+                path.length() - length,
+                length
+            );
+        }
+
+        path += fmt::format(
+            " ({})",
+            iterations
+        );
+    }
+
+    path += extension;
+
+    g.macro.author = author;
+    g.macro.description = desc;
+
+    g.macro.duration =
+        g.macro.inputs.back().frame /
+        g.macro.framerate;
+
+    g.macro.lastRecordedFrame =
+        g.macro.inputs.back().frame;
+
+#ifdef GEODE_IS_WINDOWS
+    std::wstring widePath =
+        Utils::widen(path);
+
+    if (widePath == L"Widen Error")
+        return 30;
+
+    std::ofstream f(
+        widePath,
+        std::ios::binary
+    );
+#else
+    std::ofstream f(
+        path,
+        std::ios::binary
+    );
+#endif
+
+    if (!f)
+        f.open(path, std::ios::binary);
+
+    if (!f)
+        return 20;
+
+    auto data =
+        g.macro.exportWBR();
+
+    if (data.empty())
+        return 22;
+
+    f.write(
+        reinterpret_cast<char const*>(
+            data.data()
+        ),
+        static_cast<std::streamsize>(
+            data.size()
+        )
+    );
+
+    if (!f) {
+        f.close();
+        return 21;
+    }
+
+    f.close();
+
+    return 0;
+}
+
+// END GDR-IO
 
 // ============================================================
 // SLC2
@@ -1661,7 +1549,7 @@ bool Macro::loadSLC3(
         );
 
     static_cast<
-        gdr::Replay<Macro, input>&
+        wbleg::Replay<Macro, input>&
     >(newMacro).seed =
         static_cast<int>(
             replay.m_meta.m_seed
