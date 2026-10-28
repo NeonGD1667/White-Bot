@@ -17,6 +17,14 @@ project(WhiteBot
     LANGUAGES CXX
 )
 
+# This mod is built with clang everywhere (GitHub Actions already does). cl.exe is not supported:
+# the old MSVC-only block below forced /Od (no optimization) and disabled LTO.
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    message(WARNING
+        "WhiteBot is built with clang. cl.exe is not supported; configure with clang/clang-cl instead."
+    )
+endif()
+
 # Read mod ID from mod.json
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/mod.json" MOD_JSON)
 string(JSON MOD_ID GET "${MOD_JSON}" id)
@@ -30,6 +38,7 @@ add_library(${PROJECT_NAME} SHARED
     src/keybinds.cpp
     src/utils/utils.cpp
     src/replay/gdr.cpp
+    src/replay/legacy/legacy_gdr.cpp
     src/renderer/renderer.cpp
     src/download/version_manager.cpp
 
@@ -97,7 +106,7 @@ target_link_libraries(${PROJECT_NAME}
 
 # SLC include root
 target_include_directories(${PROJECT_NAME} PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/gdr/slc"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/replay/slc"
 )
 
 # Deploy packaged mod to local Geometry Dash mods folder on Windows
@@ -118,32 +127,5 @@ if (WIN32)
             "${DESKTOP_GEODE_MODS_DIR}/${MOD_ID}.geode"
 
         VERBATIM
-    )
-endif()
-
-# MSVC-specific compiler settings
-if (MSVC)
-    # Disable Link-Time Code Generation (WholeProgramOptimization)
-    # which can cause CL.exe crashes.
-    set_property(
-        TARGET ${PROJECT_NAME}
-        PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE
-    )
-
-    set_property(
-        TARGET ${PROJECT_NAME}
-        PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO FALSE
-    )
-
-    set_property(
-        TARGET ${PROJECT_NAME}
-        PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE FALSE
-    )
-
-    target_compile_options(${PROJECT_NAME} PRIVATE
-        /Zm200
-        /bigobj
-        /d2ReducedOptimizeHugeFunctions
-        /Od
     )
 endif()
