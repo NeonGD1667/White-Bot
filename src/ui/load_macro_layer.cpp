@@ -158,112 +158,43 @@ LoadMacroLayer *LoadMacroLayer::create(geode::Popup *layer,
 }
 
 void LoadMacroLayer::onImportMacroFinished(file::PickResult res) {
-  if (res.isOk() && res.unwrap().has_value()) {
-    std::filesystem::path path = res.unwrap().value();
+  if (!res.isOk() || !res.unwrap().has_value())
+    return;
 
-    auto &g = Global::get();
-    Macro tempMacro;
-    std::vector<std::uint8_t> macroData;
-    bool gdr2Macro = false;
+  // Validation, format detection, conversion and unique naming all live in Macro::importToFolder().
+  auto imported = Macro::importToFolder(
+      res.unwrap().value(),
+      Mod::get()->getSettingValue<std::filesystem::path>("macros_folder"));
 
-    if (path.extension() == ".xd") {
-      tempMacro = Macro::XDtoGDR(path);
+  if (!imported.ok) {
+    std::string text = "There was an error importing this macro. ID: " +
+                       std::to_string(imported.errorId);
 
-      if (tempMacro.description == "fail") {
-        FLAlertLayer::create(
-            "Error", "There was an error importing this macro. ID: 46", "Ok")
-            ->show();
-        return;
-      }
-    } else {
+    if (!imported.message.empty())
+      text += "\n<cy>" + imported.message + "</c>";
 
-      std::ifstream f(path, std::ios::binary);
-
-      f.seekg(0, std::ios::end);
-      size_t fileSize = f.tellg();
-      f.seekg(0, std::ios::beg);
-
-      macroData.resize(fileSize);
-
-      f.read(reinterpret_cast<char *>(macroData.data()), fileSize);
-      f.close();
-
-      if (Macro::isGDR2Data(macroData)) {
-        gdr2Macro = true;
-        auto imported = Macro::importGDR2(macroData);
-        if (!imported.has_value()) {
-          FLAlertLayer::create(
-              "Error", "There was an error importing this macro. ID: 48", "Ok")
-              ->show();
-          return;
-        }
-
-        tempMacro = std::move(imported.value());
-      } else {
-        tempMacro = Macro::importData(macroData);
-      }
-    }
-
-    bool xdMacro = path.extension() == ".xd";
-
-    int iterations = 0;
-
-    std::string name = path.filename().string().substr(
-        0, path.filename().string().find_last_of('.'));
-
-    std::filesystem::path newPath =
-        Mod::get()->getSettingValue<std::filesystem::path>("macros_folder") /
-        name;
-
-    std::filesystem::path finalPath =
-        Mod::get()->getSettingValue<std::filesystem::path>("macros_folder") /
-        name;
-
-    iterations = 0;
-    std::string finalExtension = gdr2Macro ? ".gdr2" : ".gdr.json";
-    while (std::filesystem::exists(finalPath.string() + finalExtension)) {
-      iterations++;
-      std::string suffix = " (" + std::to_string(iterations) + ")";
-      finalPath =
-          finalPath.parent_path() / (finalPath.stem().string() + suffix);
-    }
-
-    finalPath += finalExtension;
-
-    std::ofstream f2(finalPath, std::ios::binary);
-    if (!f2.is_open()) {
-      FLAlertLayer::create("Error", "Failed to open file for writing. ID: 47",
-                           "Ok")
-          ->show();
-      return;
-    }
-
-    if (gdr2Macro) {
-      f2.write(reinterpret_cast<const char *>(macroData.data()), macroData.size());
-    } else {
-      auto data = tempMacro.exportData(true);
-      f2.write(reinterpret_cast<const char *>(data.data()), data.size());
-    }
-    f2.close();
-
-    this->reloadList(0);
-
-    if (xdMacro)
-      FLAlertLayer::create("Warning",
-                           "<cl>.xd</c> extension macros may not function "
-                           "correctly in this version.",
-                           "Ok")
-          ->show();
-
-    Notification::create("Macro Imported", NotificationIcon::Success)->show();
+    FLAlertLayer::create("Error", text.c_str(), "Ok")->show();
+    return;
   }
+
+  this->reloadList(0);
+
+  if (imported.fromXd)
+    FLAlertLayer::create("Warning",
+                         "<cl>.xd</c> extension macros may not function "
+                         "correctly in this version.",
+                         "Ok")
+        ->show();
+
+  Notification::create("Macro Imported", NotificationIcon::Success)->show();
 }
 
 void LoadMacroLayer::onImportMacro(CCObject *) {
   file::FilePickOptions::Filter textFilter;
   file::FilePickOptions fileOptions;
   textFilter.description = "Macro Files";
-  textFilter.files = {"*.gdr", "*.gdr2", "*.xd", "*.json"};
+  textFilter.files = {"*.gdr",  "*.gdr2", "*.wbr",  "*.xd",
+                      "*.json", "*.slc2", "*.slc3"};
   fileOptions.filters.push_back(textFilter);
 
   geode::async::spawn(
@@ -479,8 +410,9 @@ void LoadMacroLayer::addList(bool refresh, float prevScroll) {
   for (int i = start; i != end; i += step) {
 
    if (macros[i].extension() != ".gdr" && macros[i].extension() != ".gdr2" &&
-    macros[i].extension() != ".xd" && macros[i].extension() != ".json" &&
-    macros[i].extension() != ".slc2" && macros[i].extension() != ".slc3")
+    macros[i].extension() != ".wbr" && macros[i].extension() != ".xd" &&
+    macros[i].extension() != ".json" && macros[i].extension() != ".slc2" &&
+    macros[i].extension() != ".slc3")
   continue;
 
     std::string name = macros[i].filename().string().substr(
