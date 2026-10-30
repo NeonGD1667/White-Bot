@@ -89,6 +89,44 @@ struct Macro : wbleg::Replay<Macro, input> {
         bool importInputs = true
     );
 
+    // Result of Macro::readFile().
+    struct LoadResult {
+        bool ok = false;
+        // Id shown in the UI alert: 44 = SLC, 45 = XD, 48 = GDR2, 49 = GDR1 / WBR / unknown content,
+        // 50 = the file could not be read.
+        int errorId = 0;
+        std::string message; // human-readable reason, empty on success
+    };
+
+    // Reads ANY supported macro file into `out` without modifying Global::get().macro:
+    //   .xd, .slc2, .slc3  -> by extension (their loaders install into Global, which is restored afterwards)
+    //   everything else    -> detected from the content: GDR1 (MessagePack / JSON), GDR2, WBR
+    // This is the single loading path used by the macro list, the import button and merge.
+    static LoadResult readFile(
+        std::filesystem::path const& path,
+        Macro& out
+    );
+
+    // Result of Macro::importToFolder().
+    struct ImportResult {
+        bool ok = false;
+        // 44 SLC / 45 XD / 48 GDR2 / 49 GDR1-WBR-unknown / 50 unreadable (same as LoadResult), 47 the destination
+        // file could not be written, 51 the macro could not be converted.
+        int errorId = 0;
+        std::string message;
+        std::filesystem::path createdPath;
+        bool fromXd = false; // the UI shows the ".xd may not work" warning
+    };
+
+    // Imports a macro file into the macros folder. The file is validated first (nothing is written for a bad file).
+    //   GDR2, WBR (detected from the content) and SLC2 / SLC3 are stored byte for byte, nothing is converted;
+    //   GDR1 (MessagePack / JSON) and XD are stored as readable .gdr.json, as before.
+    // An existing file is never overwritten: "name (1).ext", "name (2).ext"...
+    static ImportResult importToFolder(
+        std::filesystem::path const& source,
+        std::filesystem::path const& folder
+    );
+
     // json == true -> GDR1 JSON text, false -> GDR1 MessagePack. Returns an empty vector on failure.
     std::vector<std::uint8_t> exportData(
         bool exportJson = false
