@@ -128,60 +128,29 @@ void MacroCell::handleLoad() {
     auto& g = Global::get();
 
     Macro newMacro;
-    Macro oldMacro = g.macro;
 
-    if (path.extension() == ".xd") {
-        if (!Macro::loadXDFile(path)) {
-            if (!isMerge)
-                return FLAlertLayer::create(
-                    "Error",
-                    "There was an error loading this macro. ID: 45",
-                    "Ok"
-                )->show();
-            else
-                return;
+    // Single loading path for every format (.gdr, .gdr.json, .gdr2, .wbr, .xd, .slc2, .slc3). The format of GDR1 /
+    // GDR2 / WBR files is detected from the content, and the current macro (g.macro) is never modified here, so a
+    // failed load or a merge leaves it intact.
+    auto loaded = Macro::readFile(path, newMacro);
+
+    if (!loaded.ok) {
+        if (!isMerge) {
+            std::string text =
+                "There was an error loading this macro. ID: " +
+                std::to_string(loaded.errorId);
+
+            if (!loaded.message.empty())
+                text += "\n<cy>" + loaded.message + "</c>";
+
+            return FLAlertLayer::create(
+                "Error",
+                text.c_str(),
+                "Ok"
+            )->show();
         }
 
-        newMacro = g.macro;
-
-        if (isMerge)
-            g.macro = oldMacro;
-    }
-    else {
-        std::ifstream f(path.string(), std::ios::binary);
-
-        f.seekg(0, std::ios::end);
-        size_t fileSize = f.tellg();
-        f.seekg(0, std::ios::beg);
-
-        std::vector<std::uint8_t> macroData(fileSize);
-
-        f.read(
-            reinterpret_cast<char*>(macroData.data()),
-            fileSize
-        );
-
-        f.close();
-
-        if (Macro::isGDR2Data(macroData)) {
-            auto imported = Macro::importGDR2(macroData);
-
-            if (!imported.has_value()) {
-                if (!isMerge)
-                    return FLAlertLayer::create(
-                        "Error",
-                        "There was an error loading this macro. ID: 48",
-                        "Ok"
-                    )->show();
-                else
-                    return;
-            }
-
-            newMacro = std::move(imported.value());
-        }
-        else {
-            newMacro = Macro::importData(macroData);
-        }
+        return;
     }
 
     if (isMerge) {
