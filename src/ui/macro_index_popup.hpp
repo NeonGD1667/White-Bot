@@ -174,6 +174,9 @@ private:
     if (format == "slc3")
       return ".slc3";
 
+    if (format == "wbr")
+      return ".wbr";
+
     return ".gdr2";
   }
 
