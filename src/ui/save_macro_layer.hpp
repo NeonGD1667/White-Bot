@@ -13,14 +13,92 @@ class SaveMacroLayer : public geode::Popup {
         GdrJson,
         Gdr2,
         Slc2,
-        Slc3
+        Slc3,
+        Wbr
     };
 
-    Format currentFormat = Format::Gdr;
+    // Starts on the format chosen in the "Default Macro Format" setting (mod.json).
+    Format currentFormat = defaultFormat();
 
     CCMenuItemSpriteExtra* formatBtn = nullptr;
 
 private:
+    // Maps the "default_macro_format" setting to a format. The setting only offers values the menu can save; anything
+    // else (for example a value stored by an older version) falls back to WBR, the default.
+    static Format defaultFormat() {
+        auto const value =
+            Mod::get()->getSettingValue<std::string>("default_macro_format");
+
+        if (value == "GDR")
+            return Format::Gdr;
+
+        if (value == "GDR JSON")
+            return Format::GdrJson;
+
+        if (value == "GDR2")
+            return Format::Gdr2;
+
+        if (value == "SLC2")
+            return Format::Slc2;
+
+        if (value == "SLC3")
+            return Format::Slc3;
+
+        return Format::Wbr;
+    }
+
+    // Name of the default format exactly as the setting spells it (see "one-of" in mod.json).
+    static std::string defaultFormatName() {
+        switch (defaultFormat()) {
+            case Format::Gdr:
+                return "GDR";
+
+            case Format::GdrJson:
+                return "GDR JSON";
+
+            case Format::Gdr2:
+                return "GDR2";
+
+            case Format::Slc2:
+                return "SLC2";
+
+            case Format::Slc3:
+                return "SLC3";
+
+            case Format::Wbr:
+                break;
+        }
+
+        return "WBR";
+    }
+
+    // Short reason appended to the generic error text (the "ID: n" part is unchanged).
+    static std::string saveErrorDetail(int result) {
+        switch (result) {
+            case 20:
+                return "\n<cy>The file could not be created.</c>";
+
+            case 21:
+                return "\n<cy>Writing the file failed.</c>";
+
+            case 22:
+                return "\n<cy>This format could not store the macro (see the "
+                       "Geode log).</c>";
+
+            case 30:
+                return "\n<cy>The macro name cannot be used as a file path.</c>";
+
+            case 31:
+                return "\n<cy>The macro has no actions to save.</c>";
+
+            case 40:
+                return "\n<cy>The macro could not be converted to SLC.</c>";
+
+            default:
+                return "";
+        }
+    }
+
     std::string formatLabel() const {
         switch (currentFormat) {
             case Format::Gdr:
@@ -37,6 +115,9 @@ private:
 
             case Format::Slc3:
                 return "Format: SLC3";
+
+            case Format::Wbr:
+                return "Format: WBR";
         }
 
         return "Format: GDR";
@@ -181,6 +262,23 @@ private:
 
         menu->addChild(formatBtn);
 
+        // Small hint next to the format button: the format set in "Default Macro Format" (mod.json)
+        CCLabelBMFont* defaultLabel =
+            CCLabelBMFont::create(
+                (
+                    "Default: " +
+                    defaultFormatName()
+                ).c_str(),
+                "chatFont.fnt"
+            );
+
+        defaultLabel->setAnchorPoint({0.f, 0.5f});
+        defaultLabel->setPosition({-50, -78});
+        defaultLabel->setOpacity(110);
+        defaultLabel->setScale(0.5f);
+
+        menu->addChild(defaultLabel);
+
         return true;
     }
 
@@ -240,6 +338,10 @@ public:
                 break;
 
             case Format::Slc3:
+                currentFormat = Format::Wbr;
+                break;
+
+            case Format::Wbr:
                 currentFormat = Format::Gdr;
                 break;
         }
@@ -315,6 +417,14 @@ public:
                     path.string()
                 );
                 break;
+
+            case Format::Wbr:
+                result = Macro::saveWBR(
+                    author,
+                    desc,
+                    path.string()
+                );
+                break;
         }
 
         if (result != 0) {
@@ -322,7 +432,8 @@ public:
                 "Error",
                 (
                     "There was an error saving the macro. ID: " +
-                    std::to_string(result)
+                    std::to_string(result) +
+                    saveErrorDetail(result)
                 ).c_str(),
                 "Ok"
             )->show();
