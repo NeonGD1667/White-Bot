@@ -3,6 +3,8 @@
 #include "ui/record_layer.hpp"
 
 #include <array>
+#include <cctype>
+#include <system_error>
 #include <bit>
 #include <cstring>
 #include <optional>
@@ -115,7 +117,8 @@ void Macro::autoSave(GJGameLevel* level, int number) {
             ? GJAccountManager::sharedState()->m_username
             : "";
 
-    int result = Macro::save(
+    // Autosaves are always written as WBR (compact, CRC-checked, keeps frame fixes).
+    int result = Macro::saveWBR(
         username,
         fmt::format(
             "AutoSave {} in level {}",
@@ -175,15 +178,25 @@ void Macro::tryAutosave(
             g.currentSession
         );
 
+    // Replace this session's previous autosave. Macro::saveWBR never overwrites (it appends " (n)" to an
+    // existing name), so the old file must be removed first. The legacy .gdr name is removed too, for sessions
+    // that were autosaving before the switch to WBR.
     std::error_code ec;
 
     std::filesystem::remove(
-        path.string() + ".gdr",
+        path.string() + ".wbr",
         ec
     );
 
     if (ec)
         log::warn("Failed to remove previous autosave");
+
+    std::error_code legacyEc;
+
+    std::filesystem::remove(
+        path.string() + ".gdr",
+        legacyEc
+    );
 
     autoSave(
         level,
@@ -739,7 +752,240 @@ std::vector<std::uint8_t> exportWith(
     return std::move(bytes.value());
 }
 
+std::string lowerExtension(
+    std::filesystem::path const& path
+) {
+    std::string ext = path.extension().string();
+
+    for (char& c : ext)
+        c = static_cast<char>(
+            std::tolower(static_cast<unsigned char>(c))
+        );
+
+    return ext;
+}
+
+bool readAllBytes(
+    std::filesystem::path const& path,
+    std::vector<std::uint8_t>& out,
+    std::string& error
+) {
+    std::error_code ec;
+
+    auto const size = std::filesystem::file_size(path, ec);
+
+    if (ec) {
+        error = "cannot read the file (" + ec.message() + ")";
+        return false;
+    }
+
+    if (size == 0) {
+        error = "the file is empty";
+        return false;
+    }
+
+    if (size > gdr::Limits{}.maxFileBytes) {
+        error = "the file is too large";
+        return false;
+    }
+
+    std::ifstream file(path, std::ios::binary);
+
+    if (!file) {
+        error = "cannot open the file";
+        return false;
+    }
+
+    out.resize(static_cast<std::size_t>(size));
+
+    file.read(
+        reinterpret_cast<char*>(out.data()),
+        static_cast<std::streamsize>(out.size())
+    );
+
+    if (static_cast<std::size_t>(file.gcount()) != out.size()) {
+        error = "the file could not be read completely";
+        return false;
+    }
+
+    return true;
+}
+
 } // namespace
+
+Macro::LoadResult Macro::readFile(
+    std::filesystem::path const& path,
+    Macro& out
+) {
+    LoadResult result;
+    auto& g = Global::get();
+    std::string const ext = lowerExtension(path);
+
+    // The XD / SLC loaders install the macro into Global. Keep the current macro intact so that loading for a
+    // merge (or a failed load) never changes it.
+    auto viaGlobal = [&](
+        bool (*loader)(std::filesystem::path),
+        int id,
+        char const* failure
+    ) {
+        Macro backup = g.macro;
+
+        bool const ok = loader(path);
+
+        if (ok)
+            out = g.macro;
+
+        g.macro = std::move(backup);
+
+        if (ok) {
+            result.ok = true;
+        } else {
+            result.errorId = id;
+            result.message = failure;
+        }
+
+        return result;
+    };
+
+    if (ext == ".xd")
+        return viaGlobal(&Macro::loadXDFile, 45, "the XD macro could not be read");
+
+    if (ext == ".slc2" || ext == ".slc3")
+        return viaGlobal(
+            ext == ".slc2" ? &Macro::loadSLC2 : &Macro::loadSLC3,
+            44,
+            "the SLC macro could not be read"
+        );
+
+    std::vector<std::uint8_t> data;
+    std::string reason;
+
+    if (!readAllBytes(path, data, reason)) {
+        result.errorId = 50;
+        result.message = std::move(reason);
+        return result;
+    }
+
+    auto macro = tryImport(data, &reason);
+
+    if (!macro) {
+        result.errorId =
+            gdr::detectFormat(data).format == gdr::Format::Gdr2 ? 48 : 49;
+        result.message = std::move(reason);
+        return result;
+    }
+
+    out = std::move(*macro);
+    result.ok = true;
+
+    return result;
+}
+
+Macro::ImportResult Macro::importToFolder(
+    std::filesystem::path const& source,
+    std::filesystem::path const& folder
+) {
+    ImportResult result;
+    Macro macro;
+
+    auto const loaded = readFile(source, macro);
+
+    if (!loaded.ok) {
+        // the import button has always reported XD failures as 46 (the macro list uses 45)
+        result.errorId = loaded.errorId == 45 ? 46 : loaded.errorId;
+        result.message = loaded.message;
+        return result;
+    }
+
+    std::string const ext = lowerExtension(source);
+    std::string extension = ".gdr.json";
+    std::vector<std::uint8_t> bytes;
+    std::string reason;
+    bool copyAsIs = false;
+
+    if (ext == ".slc2" || ext == ".slc3") {
+        extension = ext;
+        copyAsIs = true;
+    }
+    else if (ext != ".xd") {
+        if (!readAllBytes(source, bytes, reason)) {
+            result.errorId = 50;
+            result.message = std::move(reason);
+            return result;
+        }
+
+        switch (gdr::detectFormat(bytes).format) {
+            case gdr::Format::Gdr2:
+                extension = ".gdr2";
+                copyAsIs = true;
+                break;
+
+            case gdr::Format::Wbr:
+                extension = ".wbr";
+                copyAsIs = true;
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    if (copyAsIs && bytes.empty() && !readAllBytes(source, bytes, reason)) {
+        result.errorId = 50;
+        result.message = std::move(reason);
+        return result;
+    }
+
+    if (!copyAsIs) {
+        bytes = macro.exportData(true);
+
+        if (bytes.empty()) {
+            result.errorId = 51;
+            result.message = "the macro could not be converted";
+            return result;
+        }
+    }
+
+    // "a.gdr.json" -> "a": the same rule the macro list uses for .json files
+    std::string name = source.stem().string();
+
+    if (ext == ".json" && name.size() > 4 &&
+        name.compare(name.size() - 4, 4, ".gdr") == 0)
+        name.resize(name.size() - 4);
+
+    std::error_code ec;
+    std::filesystem::create_directories(folder, ec);
+
+    std::filesystem::path target = folder / (name + extension);
+
+    for (int i = 1; std::filesystem::exists(target, ec); i++)
+        target = folder / (name + " (" + std::to_string(i) + ")" + extension);
+
+    std::ofstream out(target, std::ios::binary);
+
+    if (out)
+        out.write(
+            reinterpret_cast<char const*>(bytes.data()),
+            static_cast<std::streamsize>(bytes.size())
+        );
+
+    if (!out) {
+        out.close();
+        std::filesystem::remove(target, ec);
+
+        result.errorId = 47;
+        result.message = "the macro could not be written to the macros folder";
+        return result;
+    }
+
+    out.close();
+
+    result.ok = true;
+    result.createdPath = std::move(target);
+    result.fromXd = ext == ".xd";
+
+    return result;
+}
 
 Macro Macro::importData(
     std::vector<std::uint8_t> const& data,
