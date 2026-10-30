@@ -261,17 +261,22 @@
                 "ios"
             ]
         },
-        "default_macro_format": {
-            "type": "string",
-            "name": "Default Macro Format",
-            "description": "Sets the default format used when saving macros.",
-            "default": "GDR2",
-            "one-of": [
-                "GDR2",
-                "SLC",
-                "SLC2",
-                "SLC3"
-            ]
+    "default_macro_format": {
+             "type": "string",
+             "name": "Default Macro Format",
+         "description": "Sets the default format used when saving macros.",
+          "default": "GDR2",
+         "description": "Format preselected in the Save Macro menu. WBR is the new compact White Bot format; GDR2 and GDR are compatible with other bots.",
+         "default": "WBR",
+             "one-of": [
+            "WBR",
+            "GDR2",
+            "SLC",
+            "GDR",
+            "GDR JSON",
+            "SLC2",
+            "SLC3"
+             ]
         },
         "macro_index_url": {
             "name": "Macro Index URL",
