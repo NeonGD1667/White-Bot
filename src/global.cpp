@@ -3,6 +3,8 @@
 
 #include <Geode/binding/LevelEditorLayer.hpp>
 #include <Geode/modify/CCTextInputNode.hpp>
+#include <asp/fs/std.hpp>
+#include <fstream>
 
 #ifdef GEODE_IS_WINDOWS
 // #include <geode.custom-keybinds/include/Keybinds.hpp> // incompatible with
@@ -64,8 +66,8 @@ bool Global::hasIncompatibleMods() {
     asp::fs::Path configPath = mod->getSaveDir() / "config.json";
     using namespace nlohmann;
 
-    if (std::filesystem::exists(configPath)) {
-      std::ifstream jsonFile(configPath);
+    if (configPath.exists()) {
+    std::ifstream jsonFile(configPath.toStdPath());
       if (jsonFile.is_open()) {
         json jsonData;
         jsonFile >> jsonData;
@@ -79,22 +81,24 @@ bool Global::hasIncompatibleMods() {
 
 #else
 
-  if (Mod *mod = Loader::get()->getLoadedMod("tobyadd.gdh_mobile")) {
+  if (Mod* mod = Loader::get()->getLoadedMod("tobyadd.gdh_mobile")) {
     asp::fs::Path configPath = mod->getSaveDir() / "config.json";
     using namespace nlohmann;
 
-    if (std::filesystem::exists(configPath)) {
-      std::ifstream jsonFile(configPath);
-      if (jsonFile.is_open()) {
-        json jsonData;
-        jsonFile >> jsonData;
-        if (jsonData.contains("fps_value")) {
-          if (jsonData["fps_value"] != 240)
-            settingsToDisable.push_back("<cr>TPS Bypass (GDH)</c>");
+    if (configPath.exists()) {
+        std::ifstream jsonFile(configPath.toStdPath());
+
+        if (jsonFile.is_open()) {
+            json jsonData;
+            jsonFile >> jsonData;
+
+            if (jsonData.contains("fps_value")) {
+                if (jsonData["fps_value"] != 240)
+                    settingsToDisable.push_back("<cr>TPS Bypass (GDH)</c>");
+            }
         }
-      }
     }
-  }
+}
 
 #endif
 

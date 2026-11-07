@@ -197,23 +197,21 @@ public:
         }
 
         asp::fs::Path path =
-            Mod::get()->getSettingValue<
-                asp::fs::Path
-            >("macros_folder");
+    Mod::get()->getSettingValue<asp::fs::Path>("macros_folder");
 
-        if (!std::filesystem::exists(path)) {
-            if (!utils::file::createDirectoryAll(path).isOk()) {
-                return FLAlertLayer::create(
-                    "Error",
-                    (
-                        "There was an error getting the folder \"" +
-                        path.string() +
-                        "\". ID: 10"
-                    ).c_str(),
-                    "Ok"
-                )->show();
-            }
-        }
+if (!path.exists()) {
+    if (!utils::file::createDirectoryAll(path).isOk()) {
+        return FLAlertLayer::create(
+            "Error",
+            (
+                "There was an error getting the folder \"" +
+                path.string() +
+                "\". ID: 10"
+            ).c_str(),
+            "Ok"
+        )->show();
+    }
+}
 
         SaveMacroLayer* layerReal = create();
 

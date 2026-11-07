@@ -107,7 +107,7 @@ void Macro::autoSave(GJGameLevel* level, int number) {
             number
         );
 
-    if (!std::filesystem::exists(autoSavesPath))
+    if (!autoSavesPath.exists())
         return;
 
     std::string username =
@@ -160,10 +160,10 @@ void Macro::tryAutosave(
             "autosaves_folder"
         );
 
-    if (!std::filesystem::exists(autoSavesPath)) {
-        log::debug("Failed to access auto saves path.");
-        return;
-    }
+    if (!autoSavesPath.exists()) {
+    log::debug("Failed to access auto saves path.");
+    return;
+}
 
     std::string levelname = level->m_levelName;
 

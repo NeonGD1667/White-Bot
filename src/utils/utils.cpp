@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <asp/fs/std.hpp>
 
 #ifdef GEODE_IS_WINDOWS
 #include <Windows.h>
@@ -173,7 +174,7 @@ std::time_t Utils::getFileCreationTime(
 #ifdef GEODE_IS_WINDOWS
 
     HANDLE hFile = CreateFileW(
-        path.wstring().c_str(),
+        path.toStdPath().wstring().c_str(),
         GENERIC_READ,
         FILE_SHARE_READ,
         nullptr,
