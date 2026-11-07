@@ -172,13 +172,15 @@ std::time_t Utils::getFileCreationTime(
     const asp::fs::Path& path
 ) {
 #ifdef GEODE_IS_WINDOWS
-auto stdPath = path.toStdPath();
-if (!stdPath) {
+auto stdPathResult = path.toStdPath();
+if (!stdPathResult) {
     return 0;
 }
 
+const auto& stdPath = stdPathResult.unwrap();
+
 HANDLE hFile = CreateFileW(
-    stdPath->wstring().c_str(),
+    stdPath.wstring().c_str(),
     GENERIC_READ,
     FILE_SHARE_READ,
     nullptr,
@@ -187,40 +189,36 @@ HANDLE hFile = CreateFileW(
     nullptr
 );
 
-    if (hFile == INVALID_HANDLE_VALUE) {
-        return 0;
-    }
+if (hFile == INVALID_HANDLE_VALUE) {
+    return 0;
+}
 
-    FILETIME creationTime{};
-    FILETIME lastAccessTime{};
-    FILETIME lastWriteTime{};
+FILETIME creationTime{};
+FILETIME lastAccessTime{};
+FILETIME lastWriteTime{};
 
-    if (!GetFileTime(
-            hFile,
-            &creationTime,
-            &lastAccessTime,
-            &lastWriteTime
-        )) {
-
-        CloseHandle(hFile);
-        return 0;
-    }
-
+if (!GetFileTime(
+        hFile,
+        &creationTime,
+        &lastAccessTime,
+        &lastWriteTime
+    )) {
     CloseHandle(hFile);
+    return 0;
+}
 
-    ULARGE_INTEGER ull{};
-    ull.LowPart = creationTime.dwLowDateTime;
-    ull.HighPart = creationTime.dwHighDateTime;
+CloseHandle(hFile);
 
-    return static_cast<std::time_t>(
-        ull.QuadPart / 10000000ULL
-        - 11644473600ULL
-    );
+ULARGE_INTEGER ull{};
+ull.LowPart = creationTime.dwLowDateTime;
+ull.HighPart = creationTime.dwHighDateTime;
+
+return static_cast<std::time_t>(
+    ull.QuadPart / 10000000ULL - 11644473600ULL
+);
 
 #else
-
-    return 0;
-
+return 0;
 #endif
 }
 
