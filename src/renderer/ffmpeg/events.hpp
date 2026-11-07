@@ -13,8 +13,8 @@ namespace impl {
     using StopRecorder_t = void(*)(void*);
     using WriteFrame_t = geode::Result<>(*)(void*, std::span<uint8_t const>);
     using GetAvailableCodecs_t = std::vector<std::string>(*)();
-    using MixVideoAudio_t = geode::Result<>(*)(const std::filesystem::path&, const std::filesystem::path&, const std::filesystem::path&);
-    using MixVideoRaw_t = geode::Result<>(*)(const std::filesystem::path&, std::span<float>, const std::filesystem::path&);
+    using MixVideoAudio_t = geode::Result<>(*)(const asp::fs::Path&, const asp::fs::Path&, const asp::fs::Path&);
+    using MixVideoRaw_t = geode::Result<>(*)(const asp::fs::Path&, std::span<float>, const asp::fs::Path&);
 
     struct VTable {
         CreateRecorder_t createRecorder = nullptr;
@@ -152,7 +152,7 @@ public:
      * @warning The audio file is expected to contain stereo (dual-channel) audio. Using other formats might lead to unexpected results.
      * @warning The video file is expected to contain a single video stream. Only the first video stream will be copied.
      */
-    static geode::Result<> mixVideoAudio(std::filesystem::path const& videoFile, std::filesystem::path const& audioFile, std::filesystem::path const& outputMp4File) {
+    static geode::Result<> mixVideoAudio(asp::fs::Path const& videoFile, asp::fs::Path const& audioFile, asp::fs::Path const& outputMp4File) {
         auto& vtable = impl::getVTable();
         if (!vtable.mixVideoAudio) {
             return geode::Err("FFmpeg API is not available.");
@@ -173,7 +173,7 @@ public:
      * @warning The raw audio data is expected to be stereo (dual-channel). Using mono or multi-channel audio might lead to issues.
      * @warning The video file is expected to contain a single video stream. Only the first video stream will be copied.
      */
-    static geode::Result<> mixVideoRaw(std::filesystem::path const& videoFile, std::span<float> raw, std::filesystem::path const& outputMp4File) {
+    static geode::Result<> mixVideoRaw(asp::fs::Path const& videoFile, std::span<float> raw, asp::fs::Path const& outputMp4File) {
         auto& vtable = impl::getVTable();
         if (!vtable.mixVideoRaw) {
             return geode::Err("FFmpeg API is not available.");

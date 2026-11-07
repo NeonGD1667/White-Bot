@@ -104,7 +104,7 @@ private:
     }
 
     void openRendersFolder(CCObject*) {
-        std::filesystem::path path = Mod::get()->getSettingValue<std::filesystem::path>("render_folder");
+        asp::fs::Path path = Mod::get()->getSettingValue<asp::fs::Path>("render_folder");
 
         if (std::filesystem::exists(path))
             file::openFolder(path);

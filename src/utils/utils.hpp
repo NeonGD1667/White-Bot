@@ -14,7 +14,7 @@ public:
     static std::string toLower(std::string str);
 
     static std::time_t getFileCreationTime(
-        const std::filesystem::path& path
+        const asp::fs::Path& path
     );
 
     static std::string formatTime(std::time_t time);

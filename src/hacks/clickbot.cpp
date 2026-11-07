@@ -12,7 +12,7 @@ $execute {
     }
 
     if (!g.mod->setSavedValue("clickbot_defaults4", true)) {
-        std::filesystem::path dir = g.mod->getResourcesDir();
+        asp::fs::Path dir = g.mod->getResourcesDir();
         ClickSetting setts;
 
         for (const auto& str : buttonNames) {

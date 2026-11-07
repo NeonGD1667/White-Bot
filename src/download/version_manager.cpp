@@ -64,11 +64,11 @@ enum class CheckMode {
 enum class Compat { Note, Warning, Danger };
 
 // ---------------------------------------------------------------- paths
-std::filesystem::path getModPath() {
+asp::fs::Path getModPath() {
     return Mod::get()->getPackagePath();
 }
 
-std::filesystem::path suffixed(char const* suffix) {
+asp::fs::Path suffixed(char const* suffix) {
     auto path = getModPath();
     path += suffix;
     return path;
@@ -211,7 +211,7 @@ struct PackageCheck {
 };
 
 // Kiểm tra file tải về đúng là .geode của chính mod này trước khi cho phép cài.
-Result<PackageCheck> validatePackage(std::filesystem::path const& path) {
+Result<PackageCheck> validatePackage(asp::fs::Path const& path) {
     std::error_code ec;
     auto size = std::filesystem::file_size(path, ec);
     if (ec || size < 1024)

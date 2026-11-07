@@ -196,9 +196,9 @@ public:
             )->show();
         }
 
-        std::filesystem::path path =
+        asp::fs::Path path =
             Mod::get()->getSettingValue<
-                std::filesystem::path
+                asp::fs::Path
             >("macros_folder");
 
         if (!std::filesystem::exists(path)) {
@@ -259,9 +259,9 @@ public:
             )->show();
         }
 
-        std::filesystem::path path =
+        asp::fs::Path path =
             Mod::get()->getSettingValue<
-                std::filesystem::path
+                asp::fs::Path
             >("macros_folder") /
             macroName;
 

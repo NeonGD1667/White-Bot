@@ -5,7 +5,7 @@
 #pragma optimize("", off)
 #endif
 
-MacroCell* MacroCell::create(std::filesystem::path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer) {
+MacroCell* MacroCell::create(asp::fs::Path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer) {
     MacroCell* ret = new MacroCell();
     if (!ret->init(path, name, date, menuLayer, mergeLayer, loadLayer)) {
         delete ret;
@@ -16,7 +16,7 @@ MacroCell* MacroCell::create(std::filesystem::path path, std::string name, std::
     return ret;
 }
 
-bool MacroCell::init(std::filesystem::path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer) {
+bool MacroCell::init(asp::fs::Path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer) {
 
     this->path = path;
     this->date = date;

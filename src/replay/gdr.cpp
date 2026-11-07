@@ -2201,7 +2201,7 @@ Result<std::vector<std::uint8_t>> convertReplay(CSpan data, const ExportOptions&
     return exportReplay(r.value(), to);
 }
 
-Result<Replay> importReplayFile(const std::filesystem::path& path, const ImportOptions& options) {
+Result<Replay> importReplayFile(const asp::fs::Path& path, const ImportOptions& options) {
     std::error_code ec;
     const auto size = std::filesystem::file_size(path, ec);
     if (ec) return makeError(ErrorCode::Io, options.format, "cannot stat '" + path.string() + "': " + ec.message());
@@ -2217,10 +2217,10 @@ Result<Replay> importReplayFile(const std::filesystem::path& path, const ImportO
     return importReplay(buf, options);
 }
 
-Result<Unit> exportReplayFile(const Replay& replay, const std::filesystem::path& path, const ExportOptions& options) {
+Result<Unit> exportReplayFile(const Replay& replay, const asp::fs::Path& path, const ExportOptions& options) {
     auto bytes = exportReplay(replay, options);
     if (!bytes) return bytes.error();
-    std::filesystem::path tmp = path;
+    asp::fs::Path tmp = path;
     tmp += ".tmp";
     {
         std::ofstream f(tmp, std::ios::binary | std::ios::trunc);

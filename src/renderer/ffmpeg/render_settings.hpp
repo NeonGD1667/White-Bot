@@ -319,7 +319,7 @@ struct RenderSettings {
     uint32_t m_width = 1920;
     uint32_t m_height = 1080;
     uint16_t m_fps = 60;
-    std::filesystem::path m_outputFile;
+    asp::fs::Path m_outputFile;
 };
 
 END_FFMPEG_NAMESPACE_V

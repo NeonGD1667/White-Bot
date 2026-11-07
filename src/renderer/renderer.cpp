@@ -210,8 +210,8 @@ bool Renderer::shouldUseAPI() {
 bool Renderer::toggle() {
   auto &g = Global::get();
   bool foundApi = Loader::get()->isModLoaded("eclipse.ffmpeg-api");
-  std::filesystem::path ffmpegPath =
-      Mod::get()->getSettingValue<std::filesystem::path>("ffmpeg_path");
+  asp::fs::Path ffmpegPath =
+      Mod::get()->getSettingValue<asp::fs::Path>("ffmpeg_path");
   bool foundExe = std::filesystem::exists(ffmpegPath) &&
                   ffmpegPath.filename().string() == "ffmpeg.exe";
 
@@ -260,8 +260,8 @@ bool Renderer::toggle() {
       return false;
     }
 
-    std::filesystem::path path =
-        Mod::get()->getSettingValue<std::filesystem::path>("render_folder");
+    asp::fs::Path path =
+        Mod::get()->getSettingValue<asp::fs::Path>("render_folder");
 
     if (std::filesystem::exists(path))
       g.renderer.start();
@@ -353,7 +353,7 @@ void Renderer::start() {
       fmt::format("render_{}_{}{}", std::string_view(pl->m_level->m_levelName),
                   std::to_string(timestamp), extension);
   std::string path =
-      (Mod::get()->getSettingValue<std::filesystem::path>("render_folder") /
+      (Mod::get()->getSettingValue<asp::fs::Path>("render_folder") /
        filename)
           .string();
 
@@ -606,9 +606,9 @@ void Renderer::start() {
     });
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    std::filesystem::path recordedAudioFile =
+    asp::fs::Path recordedAudioFile =
         Mod::get()->getSaveDir() / "fmodoutput.wav";
-    std::filesystem::path recordedAudioLegacy = "fmodoutput.wav";
+    asp::fs::Path recordedAudioLegacy = "fmodoutput.wav";
 
     if (!std::filesystem::exists(recordedAudioFile) &&
         std::filesystem::exists(recordedAudioLegacy)) {
@@ -650,10 +650,10 @@ void Renderer::start() {
       return;
     }
 
-    std::filesystem::path tempPath =
-        std::filesystem::path(path).parent_path() /
-        ("temp_" + std::filesystem::path(path).filename().string());
-    std::filesystem::path tempPathAudio =
+    asp::fs::Path tempPath =
+        asp::fs::Path(path).parent_path() /
+        ("temp_" + asp::fs::Path(path).filename().string());
+    asp::fs::Path tempPathAudio =
         (Mod::get()->getSaveDir() / "temp_audio_file.wav");
 
     if (usingApi) {
@@ -736,7 +736,7 @@ void Renderer::start() {
               fadeOutVideo ? std::to_string(fadeOutTime) : "2",
               fadeOutVideo ? fadeOutStart : totalTime - timeAfter - 3.5f);
 
-        std::filesystem::path file =
+        asp::fs::Path file =
             audioMode == AudioMode::Song ? songFile : tempPathAudio;
         float offset = audioMode == AudioMode::Song
                            ? songOffset

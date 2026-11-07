@@ -34,8 +34,8 @@ class $modify(CCMenu) {
 
 void LoadMacroLayer::open(geode::Popup *layer, geode::Popup *layer2,
                           bool autosaves) {
-  std::filesystem::path path =
-      Mod::get()->getSettingValue<std::filesystem::path>("macros_folder");
+  asp::fs::Path path =
+      Mod::get()->getSettingValue<asp::fs::Path>("macros_folder");
 
   if (!std::filesystem::exists(path)) {
     if (utils::file::createDirectoryAll(path).isErr())
@@ -44,7 +44,7 @@ void LoadMacroLayer::open(geode::Popup *layer, geode::Popup *layer2,
           ->show();
   }
 
-  path = Mod::get()->getSettingValue<std::filesystem::path>("autosaves_folder");
+  path = Mod::get()->getSettingValue<asp::fs::Path>("autosaves_folder");
 
   if (!std::filesystem::exists(path)) {
     if (utils::file::createDirectoryAll(path).isErr())
@@ -159,7 +159,7 @@ LoadMacroLayer *LoadMacroLayer::create(geode::Popup *layer,
 
 void LoadMacroLayer::onImportMacroFinished(file::PickResult res) {
   if (res.isOk() && res.unwrap().has_value()) {
-    std::filesystem::path path = res.unwrap().value();
+    asp::fs::Path path = res.unwrap().value();
 
     auto &g = Global::get();
     Macro tempMacro;
@@ -211,12 +211,12 @@ void LoadMacroLayer::onImportMacroFinished(file::PickResult res) {
     std::string name = path.filename().string().substr(
         0, path.filename().string().find_last_of('.'));
 
-    std::filesystem::path newPath =
-        Mod::get()->getSettingValue<std::filesystem::path>("macros_folder") /
+    asp::fs::Path newPath =
+        Mod::get()->getSettingValue<asp::fs::Path>("macros_folder") /
         name;
 
-    std::filesystem::path finalPath =
-        Mod::get()->getSettingValue<std::filesystem::path>("macros_folder") /
+    asp::fs::Path finalPath =
+        Mod::get()->getSettingValue<asp::fs::Path>("macros_folder") /
         name;
 
     iterations = 0;
@@ -464,10 +464,10 @@ void LoadMacroLayer::updateSort(CCObject *) {
 void LoadMacroLayer::addList(bool refresh, float prevScroll) {
   cocos2d::CCSize winSize = cocos2d::CCDirector::sharedDirector()->getWinSize();
 
-  std::filesystem::path path =
-      Mod::get()->getSettingValue<std::filesystem::path>(
+  asp::fs::Path path =
+      Mod::get()->getSettingValue<asp::fs::Path>(
           isAutosaves ? "autosaves_folder" : "macros_folder");
-  std::vector<std::filesystem::path> macros =
+  std::vector<asp::fs::Path> macros =
       file::readDirectory(path).unwrapOrDefault();
 
   CCArray *cells = CCArray::create();

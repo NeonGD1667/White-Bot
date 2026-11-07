@@ -404,7 +404,7 @@ void ClickSettingsLayer::onSelectFile(CCObject*) {
 
 	geode::async::spawn(file::pick(file::PickMode::OpenFile, { Mod::get()->getResourcesDir(), { textFilter } }), [this](file::PickResult res) {
 		if (res.isOk() && res.unwrap().has_value()) {
-			std::filesystem::path path = res.unwrap().value();
+			asp::fs::Path path = res.unwrap().value();
 
 			filenameLabel->setString(path.filename().string().c_str());
 
@@ -427,7 +427,7 @@ void ClickSettingsLayer::onRestore(CCObject*) {
 
 	settings.disabled = false;
 	
-	std::filesystem::path path = Mod::get()->getResourcesDir() / fmt::format("default_{}.mp3", button);
+	asp::fs::Path path = Mod::get()->getResourcesDir() / fmt::format("default_{}.mp3", button);
 
 	filenameLabel->setString(path.filename().string().c_str());
 

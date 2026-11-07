@@ -95,7 +95,7 @@ void Macro::autoSave(GJGameLevel* level, int number) {
     std::string levelname = level->m_levelName;
 
     auto autoSavesPath =
-        Mod::get()->getSettingValue<std::filesystem::path>(
+        Mod::get()->getSettingValue<asp::fs::Path>(
             "autosaves_folder"
         );
 
@@ -156,7 +156,7 @@ void Macro::tryAutosave(
         return;
 
     auto autoSavesPath =
-        g.mod->getSettingValue<std::filesystem::path>(
+        g.mod->getSettingValue<asp::fs::Path>(
             "autosaves_folder"
         );
 
@@ -472,7 +472,7 @@ int Macro::saveGDR2(
 }
 
 bool Macro::loadXDFile(
-    std::filesystem::path path
+    asp::fs::Path path
 ) {
     Macro newMacro =
         Macro::XDtoGDR(path);
@@ -487,7 +487,7 @@ bool Macro::loadXDFile(
 }
 
 Macro Macro::XDtoGDR(
-    std::filesystem::path path
+    asp::fs::Path path
 ) {
     Macro newMacro;
 
@@ -1109,7 +1109,7 @@ int Macro::saveSLC2(
 }
 
 bool Macro::loadSLC2(
-    std::filesystem::path path
+    asp::fs::Path path
 ) {
 #ifdef GEODE_IS_WINDOWS
     std::ifstream file(
@@ -1468,7 +1468,7 @@ int Macro::saveSLC3(
 }
 
 bool Macro::loadSLC3(
-    std::filesystem::path path
+    asp::fs::Path path
 ) {
 #ifdef GEODE_IS_WINDOWS
     std::ifstream file(

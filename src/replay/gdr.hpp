@@ -362,11 +362,11 @@ struct Detection {
 [[nodiscard]] Detection detectFormat(std::span<const std::uint8_t> data);
 
 [[nodiscard]] Result<Replay> importReplay(std::span<const std::uint8_t> data, const ImportOptions& options = {});
-[[nodiscard]] Result<Replay> importReplayFile(const std::filesystem::path& path, const ImportOptions& options = {});
+[[nodiscard]] Result<Replay> importReplayFile(const asp::fs::Path& path, const ImportOptions& options = {});
 
 [[nodiscard]] Result<std::vector<std::uint8_t>> exportReplay(const Replay& replay, const ExportOptions& options);
 /// Writes atomically (temp file + rename).
-[[nodiscard]] Result<Unit> exportReplayFile(const Replay& replay, const std::filesystem::path& path,
+[[nodiscard]] Result<Unit> exportReplayFile(const Replay& replay, const asp::fs::Path& path,
                                             const ExportOptions& options);
 
 /// import + export. `from.format` may be Auto.

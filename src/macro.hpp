@@ -110,11 +110,11 @@ struct Macro : wbleg::Replay<Macro, input> {
     );
 
     static bool loadXDFile(
-        std::filesystem::path path
+        asp::fs::Path path
     );
 
     static Macro XDtoGDR(
-        std::filesystem::path path
+        asp::fs::Path path
     );
 
     // GDR2
@@ -151,7 +151,7 @@ struct Macro : wbleg::Replay<Macro, input> {
     );
 
     static bool loadSLC2(
-        std::filesystem::path path
+        asp::fs::Path path
     );
 
     // SLC3
@@ -162,7 +162,7 @@ struct Macro : wbleg::Replay<Macro, input> {
     );
 
     static bool loadSLC3(
-        std::filesystem::path path
+        asp::fs::Path path
     );
 
     static void autoSave(
