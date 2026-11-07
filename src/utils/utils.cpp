@@ -172,16 +172,20 @@ std::time_t Utils::getFileCreationTime(
     const asp::fs::Path& path
 ) {
 #ifdef GEODE_IS_WINDOWS
+auto stdPath = path.toStdPath();
+if (!stdPath) {
+    return 0;
+}
 
-    HANDLE hFile = CreateFileW(
-        path.toStdPath().wstring().c_str(),
-        GENERIC_READ,
-        FILE_SHARE_READ,
-        nullptr,
-        OPEN_EXISTING,
-        FILE_ATTRIBUTE_NORMAL,
-        nullptr
-    );
+HANDLE hFile = CreateFileW(
+    stdPath->wstring().c_str(),
+    GENERIC_READ,
+    FILE_SHARE_READ,
+    nullptr,
+    OPEN_EXISTING,
+    FILE_ATTRIBUTE_NORMAL,
+    nullptr
+);
 
     if (hFile == INVALID_HANDLE_VALUE) {
         return 0;

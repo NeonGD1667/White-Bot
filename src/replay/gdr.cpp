@@ -2182,59 +2182,188 @@ Result<Replay> importReplay(CSpan data, const ImportOptions& options) {
     return codec->decode(data, options, rep);
 }
 
+
 Result<std::vector<std::uint8_t>> exportReplay(const Replay& replay, const ExportOptions& options) {
     Report local;
     Report& rep = options.report ? *options.report : local;
-    if (options.format == Format::Auto || options.format == Format::Unknown)
-        return makeError(ErrorCode::InvalidValue, options.format, "ExportOptions::format must be a concrete format");
+
+    if (options.format == Format::Auto || options.format == Format::Unknown) {
+        return makeError(
+            ErrorCode::InvalidValue,
+            options.format,
+            "ExportOptions::format must be a concrete format"
+        );
+    }
+
     const auto codec = findCodec(options.format);
-    if (!codec)
-        return makeError(options.format == Format::Hlr ? ErrorCode::NotImplemented : ErrorCode::Internal, options.format,
-                         options.format == Format::Hlr ? "no HLR codec registered (no HLR specification is available yet)"
-                                                      : "codec not registered");
+
+    if (!codec) {
+        return makeError(
+            options.format == Format::Hlr ? ErrorCode::NotImplemented : ErrorCode::Internal,
+            options.format,
+            options.format == Format::Hlr
+                ? "no HLR codec registered (no HLR specification is available yet)"
+                : "codec not registered"
+        );
+    }
+
     return codec->encode(replay, options, rep);
 }
 
-Result<std::vector<std::uint8_t>> convertReplay(CSpan data, const ExportOptions& to, const ImportOptions& from) {
+Result<std::vector<std::uint8_t>> convertReplay(
+    CSpan data,
+    const ExportOptions& to,
+    const ImportOptions& from
+) {
     auto r = importReplay(data, from);
-    if (!r) return r.error();
+
+    if (!r)
+        return r.error();
+
     return exportReplay(r.value(), to);
 }
 
-Result<Replay> importReplayFile(const asp::fs::Path& path, const ImportOptions& options) {
+Result<Replay> importReplayFile(
+    const asp::fs::Path& path,
+    const ImportOptions& options
+) {
+    auto stdPath = path.toStdPath();
+
+    if (!stdPath) {
+        return makeError(
+            ErrorCode::Io,
+            options.format,
+            "cannot convert path to std::filesystem::path"
+        );
+    }
+
     std::error_code ec;
-    const auto size = std::filesystem::file_size(path, ec);
-    if (ec) return makeError(ErrorCode::Io, options.format, "cannot stat '" + path.string() + "': " + ec.message());
-    if (size == 0) return makeError(ErrorCode::Empty, options.format, "file is empty");
-    if (size > options.limits.maxFileBytes)
-        return makeError(ErrorCode::LimitExceeded, options.format, "file larger than Limits::maxFileBytes");
-    std::ifstream f(path, std::ios::binary);
-    if (!f) return makeError(ErrorCode::Io, options.format, "cannot open '" + path.string() + "'");
+    const auto size = std::filesystem::file_size(*stdPath, ec);
+
+    if (ec) {
+        return makeError(
+            ErrorCode::Io,
+            options.format,
+            "cannot stat '" + path.string() + "': " + ec.message()
+        );
+    }
+
+    if (size == 0) {
+        return makeError(ErrorCode::Empty, options.format, "file is empty");
+    }
+
+    if (size > options.limits.maxFileBytes) {
+        return makeError(
+            ErrorCode::LimitExceeded,
+            options.format,
+            "file larger than Limits::maxFileBytes"
+        );
+    }
+
+    std::ifstream f(*stdPath, std::ios::binary);
+
+    if (!f) {
+        return makeError(
+            ErrorCode::Io,
+            options.format,
+            "cannot open '" + path.string() + "'"
+        );
+    }
+
     Bytes buf(static_cast<std::size_t>(size));
-    f.read(reinterpret_cast<char*>(buf.data()), static_cast<std::streamsize>(buf.size()));
-    if (static_cast<std::size_t>(f.gcount()) != buf.size())
-        return makeError(ErrorCode::Io, options.format, "short read from '" + path.string() + "'");
+
+    f.read(
+        reinterpret_cast<char*>(buf.data()),
+        static_cast<std::streamsize>(buf.size())
+    );
+
+    if (static_cast<std::size_t>(f.gcount()) != buf.size()) {
+        return makeError(
+            ErrorCode::Io,
+            options.format,
+            "short read from '" + path.string() + "'"
+        );
+    }
+
     return importReplay(buf, options);
 }
 
-Result<Unit> exportReplayFile(const Replay& replay, const asp::fs::Path& path, const ExportOptions& options) {
+Result<Unit> exportReplayFile(
+    const Replay& replay,
+    const asp::fs::Path& path,
+    const ExportOptions& options
+) {
     auto bytes = exportReplay(replay, options);
-    if (!bytes) return bytes.error();
+
+    if (!bytes)
+        return bytes.error();
+
     asp::fs::Path tmp = path;
     tmp += ".tmp";
+
+    auto stdPath = path.toStdPath();
+
+    if (!stdPath) {
+        return makeError(
+            ErrorCode::Io,
+            options.format,
+            "cannot convert output path to std::filesystem::path"
+        );
+    }
+
+    auto stdTmp = tmp.toStdPath();
+
+    if (!stdTmp) {
+        return makeError(
+            ErrorCode::Io,
+            options.format,
+            "cannot convert temporary path to std::filesystem::path"
+        );
+    }
+
     {
-        std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
-        if (!f) return makeError(ErrorCode::Io, options.format, "cannot create '" + tmp.string() + "'");
-        f.write(reinterpret_cast<const char*>(bytes.value().data()), static_cast<std::streamsize>(bytes.value().size()));
+        std::ofstream f(*stdTmp, std::ios::binary | std::ios::trunc);
+
+        if (!f) {
+            return makeError(
+                ErrorCode::Io,
+                options.format,
+                "cannot create '" + tmp.string() + "'"
+            );
+        }
+
+        f.write(
+            reinterpret_cast<const char*>(bytes.value().data()),
+            static_cast<std::streamsize>(bytes.value().size())
+        );
+
         f.flush();
-        if (!f) return makeError(ErrorCode::Io, options.format, "write failed for '" + tmp.string() + "'");
+
+        if (!f) {
+            return makeError(
+                ErrorCode::Io,
+                options.format,
+                "write failed for '" + tmp.string() + "'"
+            );
+        }
     }
+
     std::error_code ec;
-    std::filesystem::rename(tmp, path, ec);
+    std::filesystem::rename(*stdTmp, *stdPath, ec);
+
     if (ec) {
-        std::filesystem::remove(tmp, ec);
-        return makeError(ErrorCode::Io, options.format, "cannot move temp file to '" + path.string() + "'");
+        const std::string renameError = ec.message();
+
+        std::error_code removeEc;
+        std::filesystem::remove(*stdTmp, removeEc);
+
+        return makeError(
+            ErrorCode::Io,
+            options.format,
+            "cannot move temp file to '" + path.string() + "': " + renameError
+        );
     }
+
     return Unit{};
 }
 

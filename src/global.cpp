@@ -67,7 +67,12 @@ bool Global::hasIncompatibleMods() {
     using namespace nlohmann;
 
     if (configPath.exists()) {
-    std::ifstream jsonFile(configPath.toStdPath());
+    auto stdConfigPath = configPath.toStdPath();
+if (!stdConfigPath) {
+    return;
+}
+
+std::ifstream jsonFile(*stdConfigPath);
       if (jsonFile.is_open()) {
         json jsonData;
         jsonFile >> jsonData;
@@ -80,26 +85,28 @@ bool Global::hasIncompatibleMods() {
   }
 
 #else
-
-  if (Mod* mod = Loader::get()->getLoadedMod("tobyadd.gdh_mobile")) {
+   if (Mod* mod = Loader::get()->getLoadedMod("tobyadd.gdh_mobile")) {
     asp::fs::Path configPath = mod->getSaveDir() / "config.json";
     using namespace nlohmann;
 
     if (configPath.exists()) {
-        std::ifstream jsonFile(configPath.toStdPath());
+        auto stdConfigPath = configPath.toStdPath();
 
-        if (jsonFile.is_open()) {
-            json jsonData;
-            jsonFile >> jsonData;
+        if (stdConfigPath) {
+            std::ifstream jsonFile(*stdConfigPath);
 
-            if (jsonData.contains("fps_value")) {
-                if (jsonData["fps_value"] != 240)
-                    settingsToDisable.push_back("<cr>TPS Bypass (GDH)</c>");
+            if (jsonFile.is_open()) {
+                json jsonData;
+                jsonFile >> jsonData;
+
+                if (jsonData.contains("fps_value")) {
+                    if (jsonData["fps_value"] != 240)
+                        settingsToDisable.push_back("<cr>TPS Bypass (GDH)</c>");
+                }
             }
         }
     }
 }
-
 #endif
 
   for (IncompatibleMod incompatMod : incompatibleMods) {

@@ -145,27 +145,27 @@ class $modify(PlayLayer) {
         PlayLayer::pauseGame(b1);
     }
 
-    bool init(GJGameLevel* level, bool b1, bool b2) {
-        auto& g = Global::get();
+bool init(GJGameLevel* level, bool dontCreateObjects) {
+    auto& g = Global::get();
 
-        g.firstAttempt = true;
+    g.firstAttempt = true;
 
-        if (!PlayLayer::init(level, b1, b2))
-            return false;
+    if (!PlayLayer::init(level, dontCreateObjects))
+        return false;
 
-        Global::updateKeybinds();
+    Global::updateKeybinds();
 
-        auto now = std::chrono::system_clock::now();
+    auto now = std::chrono::system_clock::now();
 
-        g.currentSession =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                now.time_since_epoch()
-            ).count();
+    g.currentSession =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()
+        ).count();
 
-        g.lastAutoSaveFrame = 0;
+    g.lastAutoSaveFrame = 0;
 
-        return true;
-    }
+    return true;
+}
 
     void resetLevel() {
         PlayLayer::resetLevel();
