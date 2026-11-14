@@ -13,7 +13,7 @@ endif()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 project(WhiteBot 
-    VERSION 3.1.0
+    VERSION 3.2.0
     LANGUAGES CXX
 )
 
