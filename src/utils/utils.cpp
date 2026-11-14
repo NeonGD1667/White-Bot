@@ -168,12 +168,12 @@ std::string Utils::toLower(std::string str) {
 }
 
 std::time_t Utils::getFileCreationTime(
-    const std::filesystem::path& path
+    const asp::fs::Path& path
 ) {
 #ifdef GEODE_IS_WINDOWS
 
     HANDLE hFile = CreateFileW(
-        path.wstring().c_str(),
+        path.native().c_str(),
         GENERIC_READ,
         FILE_SHARE_READ,
         nullptr,
@@ -247,12 +247,12 @@ int Utils::copyFile(
     const std::string& destinationPath
 ) {
     std::ifstream source(
-        sourcePath,
+        wbfs::toStd(sourcePath),
         std::ios::binary
     );
 
     std::ofstream destination(
-        destinationPath,
+        wbfs::toStd(destinationPath),
         std::ios::binary
     );
 
