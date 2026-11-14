@@ -952,11 +952,11 @@ void RecordLayer::openPresets(CCObject *) {
 }
 
 void RecordLayer::onAutosaves(CCObject *) {
-  std::filesystem::path path =
-      Mod::get()->getSettingValue<std::filesystem::path>(
+  asp::fs::Path path =
+      Mod::get()->getSettingValue<asp::fs::Path>(
           "autosaves_folder");
 
-  if (std::filesystem::exists(path))
+  if (asp::fs::exists(path))
     LoadMacroLayer::open(
         static_cast<geode::Popup *>(this),
         nullptr,

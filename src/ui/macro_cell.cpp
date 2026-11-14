@@ -5,7 +5,7 @@
 #pragma optimize("", off)
 #endif
 
-MacroCell* MacroCell::create(std::filesystem::path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer) {
+MacroCell* MacroCell::create(asp::fs::Path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer) {
     MacroCell* ret = new MacroCell();
     if (!ret->init(path, name, date, menuLayer, mergeLayer, loadLayer)) {
         delete ret;
@@ -16,7 +16,7 @@ MacroCell* MacroCell::create(std::filesystem::path path, std::string name, std::
     return ret;
 }
 
-bool MacroCell::init(std::filesystem::path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer) {
+bool MacroCell::init(asp::fs::Path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer) {
 
     this->path = path;
     this->date = date;
@@ -61,11 +61,11 @@ bool MacroCell::init(std::filesystem::path path, std::string name, std::time_t d
 
 #ifdef GEODE_IS_WINDOWS
     std::string subText = Utils::formatTime(date) + " | ";
-    subText += autosave ? "Auto Save" : path.extension().string();
+    subText += autosave ? "Auto Save" : wbfs::extension(path);
 
     lbl = CCLabelBMFont::create(subText.c_str(), "chatFont.fnt");
 #else
-    std::string subText = autosave ? "Auto Save" : path.extension().string();
+    std::string subText = autosave ? "Auto Save" : wbfs::extension(path);
 
     lbl = CCLabelBMFont::create(subText.c_str(), "chatFont.fnt");
 #endif
@@ -193,7 +193,7 @@ void MacroCell::handleLoad() {
     g.macro.DllBotMacro = g.macro.botInfo.name == "Dll Bot";
 
     bool legacyGdrMacro =
-        path.extension() == ".gdr" && !g.macro.DllBotMacro;
+        wbfs::extension(path) == ".gdr" && !g.macro.DllBotMacro;
 
     loadLayer->setKeypadEnabled(false);
     loadLayer->setTouchEnabled(false);
@@ -231,7 +231,7 @@ void MacroCell::handleLoad() {
         }
     }
 
-    if (path.extension() == ".xd")
+    if (wbfs::extension(path) == ".xd")
         FLAlertLayer::create(
             "Warning",
             "<cl>.xd</c> extension macros may not function correctly in this version.",
@@ -285,11 +285,7 @@ void MacroCell::onDelete(CCObject*) {
 }
 
 void MacroCell::deleteMacro(bool reload) {
-    std::error_code ec;
-
-    std::filesystem::remove(path, ec);
-
-    if (ec) {
+    if (!wbfs::remove(path)) {
         return FLAlertLayer::create(
             "Error",
             "There was an error deleting this macro. ID: 7",

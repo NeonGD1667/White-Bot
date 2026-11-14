@@ -8,7 +8,7 @@
 
 class MacroCell : public CCNode {
 	std::string name;
-	std::filesystem::path path;
+	asp::fs::Path path;
 	std::time_t date;
 
 	geode::Popup* menuLayer = nullptr;
@@ -22,9 +22,9 @@ public:
 	CCMenu* menu = nullptr;
 	CCMenuItemToggler* toggler = nullptr;
 
-	static MacroCell* create(std::filesystem::path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer);
+	static MacroCell* create(asp::fs::Path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer);
 
-	bool init(std::filesystem::path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer);
+	bool init(asp::fs::Path path, std::string name, std::time_t date, geode::Popup* menuLayer, geode::Popup* mergeLayer, CCLayer* loadLayer);
 
 	void onLoad(CCObject*);
 
@@ -73,7 +73,7 @@ public:
 	static void open(geode::Popup* layer, geode::Popup* layer2, bool autosaves = false);
 
 	void openFolder(CCObject*) {
-		file::openFolder(Mod::get()->getSettingValue<std::filesystem::path>(isAutosaves ? "autosaves_folder" : "macros_folder"));
+		file::openFolder(Mod::get()->getSettingValue<asp::fs::Path>(isAutosaves ? "autosaves_folder" : "macros_folder"));
 	}
 
 	void textChanged(CCTextInputNode* p) override;
