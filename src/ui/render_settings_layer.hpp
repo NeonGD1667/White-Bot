@@ -3,7 +3,7 @@
 #include "../includes.hpp"
 #include "../utils/utils.hpp"
 
-class RenderSettingsLayer : public geode::Popup, public TextInputDelegate {
+class RenderSettingsLayer : public geode::Popup {
 
 public:
   Slider *sfxSlider = nullptr;

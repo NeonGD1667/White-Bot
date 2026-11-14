@@ -12,7 +12,7 @@ struct InputText {
     std::string action;
 };
 
-class MacroEditLayer : public geode::Popup, public TextInputDelegate {
+class MacroEditLayer : public geode::Popup {
 
 private:
     

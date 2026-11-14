@@ -3,7 +3,7 @@
 #include "../includes.hpp"
 #include "../utils/utils.hpp"
 
-class SwiftClickSettingsLayer : public geode::Popup, public TextInputDelegate {
+class SwiftClickSettingsLayer : public geode::Popup {
 
 private:
   TextInput *countInput = nullptr;

@@ -1,7 +1,7 @@
 #include "../hacks/show_trajectory.hpp"
 #include "../includes.hpp"
 
-class TrajectorySettingsLayer : public geode::Popup, public TextInputDelegate {
+class TrajectorySettingsLayer : public geode::Popup {
 
 public:
   STATIC_CREATE(TrajectorySettingsLayer, 250, 180)

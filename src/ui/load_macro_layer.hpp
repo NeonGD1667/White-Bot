@@ -39,7 +39,7 @@ public:
 	void selectMacro(bool single);
 };
 
-class LoadMacroLayer : public geode::Popup, public TextInputDelegate {
+class LoadMacroLayer : public geode::Popup {
 public:
 
 	geode::Popup* menuLayer = nullptr;

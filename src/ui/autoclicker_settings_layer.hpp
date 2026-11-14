@@ -1,6 +1,6 @@
 #include "../includes.hpp"
 
-class AutoclickerLayer : public geode::Popup, public TextInputDelegate {
+class AutoclickerLayer : public geode::Popup {
 
 private:
 
