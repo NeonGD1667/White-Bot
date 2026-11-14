@@ -290,7 +290,7 @@ class $modify(GJGameLevel) {
 
 class $modify(EffectGameObject) {
 
-  void triggerObject(GJBaseGameLayer *p0, int p1, gd::vector<int> const *p2) {
+  void triggerObject(GJBaseGameLayer *p0, int p1, std::vector<int> const *p2) {
     if (!Global::get().disableShaders)
       return EffectGameObject::triggerObject(p0, p1, p2);
 
