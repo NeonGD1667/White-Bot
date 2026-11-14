@@ -4,7 +4,7 @@
 #include <Geode/modify/PlayLayer.hpp>
 
 class $modify(LevelTools) {
-    static bool verifyLevelIntegrity(gd::string v1, int v2) {
+    static bool verifyLevelIntegrity(std::string v1, int v2) {
         if (Global::get().layoutMode) return true;
         return LevelTools::verifyLevelIntegrity(v1, v2);
     }
