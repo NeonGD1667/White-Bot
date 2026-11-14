@@ -134,7 +134,7 @@ class $modify(EndLevelLayer) {
 
 class $modify(FMODAudioEngine) {
 
-  void playEffect(gd::string path, float speed, float p2, float volume) {
+  void playEffect(std::string path, float speed, float p2, float volume) {
     if (path == "explode_11.ogg" && Global::get().renderer.recording)
       return;
 
@@ -210,10 +210,10 @@ bool Renderer::shouldUseAPI() {
 bool Renderer::toggle() {
   auto &g = Global::get();
   bool foundApi = Loader::get()->isModLoaded("eclipse.ffmpeg-api");
-  std::filesystem::path ffmpegPath =
-      Mod::get()->getSettingValue<std::filesystem::path>("ffmpeg_path");
-  bool foundExe = std::filesystem::exists(ffmpegPath) &&
-                  ffmpegPath.filename().string() == "ffmpeg.exe";
+  asp::fs::Path ffmpegPath =
+      Mod::get()->getSettingValue<asp::fs::Path>("ffmpeg_path");
+  bool foundExe = asp::fs::exists(ffmpegPath) &&
+                  wbfs::filename(ffmpegPath) == "ffmpeg.exe";
 
   g.renderer.usingApi = Renderer::shouldUseAPI();
 
@@ -260,10 +260,10 @@ bool Renderer::toggle() {
       return false;
     }
 
-    std::filesystem::path path =
-        Mod::get()->getSettingValue<std::filesystem::path>("render_folder");
+    asp::fs::Path path =
+        Mod::get()->getSettingValue<asp::fs::Path>("render_folder");
 
-    if (std::filesystem::exists(path))
+    if (asp::fs::exists(path))
       g.renderer.start();
     else {
       if (utils::file::createDirectoryAll(path).isOk())
@@ -353,7 +353,7 @@ void Renderer::start() {
       fmt::format("render_{}_{}{}", std::string_view(pl->m_level->m_levelName),
                   std::to_string(timestamp), extension);
   std::string path =
-      (Mod::get()->getSettingValue<std::filesystem::path>("render_folder") /
+      (Mod::get()->getSettingValue<asp::fs::Path>("render_folder") /
        filename)
           .string();
 
@@ -606,28 +606,26 @@ void Renderer::start() {
     });
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    std::filesystem::path recordedAudioFile =
+    asp::fs::Path recordedAudioFile =
         Mod::get()->getSaveDir() / "fmodoutput.wav";
-    std::filesystem::path recordedAudioLegacy = "fmodoutput.wav";
+    asp::fs::Path recordedAudioLegacy = "fmodoutput.wav";
 
-    if (!std::filesystem::exists(recordedAudioFile) &&
-        std::filesystem::exists(recordedAudioLegacy)) {
-      std::error_code moveEc;
-      std::filesystem::rename(recordedAudioLegacy, recordedAudioFile, moveEc);
-      if (moveEc)
+    if (!asp::fs::exists(recordedAudioFile) &&
+        asp::fs::exists(recordedAudioLegacy)) {
+      if (!wbfs::rename(recordedAudioLegacy, recordedAudioFile))
         recordedAudioFile = recordedAudioLegacy;
     }
 
     if (audioMode == AudioMode::Record &&
-        !std::filesystem::exists(recordedAudioFile) &&
-        std::filesystem::exists(songFile))
+        !asp::fs::exists(recordedAudioFile) &&
+        asp::fs::exists(songFile))
       audioMode = AudioMode::Song;
 
     if ((SFXVolume == 0.f && musicVolume == 0.f) ||
         audioMode == AudioMode::Off ||
-        (audioMode == AudioMode::Song && !std::filesystem::exists(songFile)) ||
+        (audioMode == AudioMode::Song && !asp::fs::exists(songFile)) ||
         (audioMode == AudioMode::Record &&
-         !std::filesystem::exists(recordedAudioFile))) {
+         !asp::fs::exists(recordedAudioFile))) {
       if (audioMode != AudioMode::Off) {
         Loader::get()->queueInMainThread([] {
           FLAlertLayer::create("Error", "Audio file not found.", "Ok")->show();
@@ -650,10 +648,9 @@ void Renderer::start() {
       return;
     }
 
-    std::filesystem::path tempPath =
-        std::filesystem::path(path).parent_path() /
-        ("temp_" + std::filesystem::path(path).filename().string());
-    std::filesystem::path tempPathAudio =
+    asp::fs::Path tempPath =
+        wbfs::parent(path) / ("temp_" + wbfs::filename(path));
+    asp::fs::Path tempPathAudio =
         (Mod::get()->getSaveDir() / "temp_audio_file.wav");
 
     if (usingApi) {
@@ -661,7 +658,7 @@ void Renderer::start() {
       std::string file =
           audioMode == AudioMode::Song ? songFile : recordedAudioFile.string();
       auto res = ffmpeg::events::AudioMixer::mixVideoAudio(
-    path, file, tempPath
+    path, file, wbfs::toStd(tempPath)
 );
       log::debug("XD");
       if (res.isErr()) {
@@ -690,16 +687,10 @@ void Renderer::start() {
         log::info("Executing (Fade Out): {}", command);
         process = subprocess::Popen(command);
         if (!process.close()) {
-          std::error_code ec;
-          std::filesystem::remove(path, ec);
-          if (ec)
+          if (asp::fs::exists(path) && !wbfs::remove(path))
             log::warn("Failed to remove old render file.");
-          else {
-            ec.clear();
-            std::filesystem::rename(path + "_temp" + extension, path, ec);
-            if (ec)
-              log::warn("Failed to rename temp render file.");
-          }
+          else if (!wbfs::rename(path + "_temp" + extension, path))
+            log::warn("Failed to rename temp render file.");
         } else
           log::debug("Fade Out Error xD");
       }
@@ -708,7 +699,7 @@ void Renderer::start() {
         command =
             fmt::format("\"{}\" -i \"{}\" -acodec pcm_s16le "
                         "-ar 44100 -ac 2 \"{}\"",
-                        ffmpegPath, recordedAudioFile.string(), tempPathAudio);
+                        ffmpegPath, recordedAudioFile.string(), tempPathAudio.string());
 
         process = subprocess::Popen(command); // Fix ffmpeg not reading it
         if (process.close()) {
@@ -736,8 +727,8 @@ void Renderer::start() {
               fadeOutVideo ? std::to_string(fadeOutTime) : "2",
               fadeOutVideo ? fadeOutStart : totalTime - timeAfter - 3.5f);
 
-        std::filesystem::path file =
-            audioMode == AudioMode::Song ? songFile : tempPathAudio;
+        std::string file =
+            audioMode == AudioMode::Song ? songFile : tempPathAudio.string();
         float offset = audioMode == AudioMode::Song
                            ? songOffset
                            : (isPlatformer ? 0.28f : 0.f);
@@ -753,7 +744,7 @@ void Renderer::start() {
             "\"{}\" -y -ss {} -i \"{}\" -i \"{}\" -t {} -c:v copy {} -filter:a "
             "\"[1:a]adelay=0|0{}{}{}\" \"{}\"",
             ffmpegPath, offset, file, path, totalTime, extraAudioArgs,
-            fadeInString, fadeOutString, volume, tempPath);
+            fadeInString, fadeOutString, volume, tempPath.string());
 
         log::info("Executing (Audio): {}", command);
 
@@ -772,29 +763,18 @@ void Renderer::start() {
 #endif
     }
 
-    std::error_code ec;
-    std::filesystem::remove(Utils::widen(path), ec);
-    if (ec)
+    if (asp::fs::exists(path) && !wbfs::remove(path))
       log::warn("Failed to remove old render file.");
-    else {
-      ec.clear();
-      std::filesystem::rename(tempPath, Utils::widen(path), ec);
-      if (ec)
-        log::warn("Failed to rename temp render file.");
-    }
+    else if (!wbfs::rename(tempPath, path))
+      log::warn("Failed to rename temp render file.");
 
-    ec.clear();
-    std::filesystem::remove(tempPathAudio, ec);
-    if (ec)
+    if (asp::fs::exists(tempPathAudio) && !wbfs::remove(tempPathAudio))
       log::warn("Failed to remove temp audio file.");
 
-    ec.clear();
-    std::filesystem::remove(recordedAudioFile, ec);
-    if (ec)
+    if (asp::fs::exists(recordedAudioFile) && !wbfs::remove(recordedAudioFile))
       log::warn("Failed to remove fmod audio file.");
 
-    ec.clear();
-    std::filesystem::remove(recordedAudioLegacy, ec);
+    wbfs::remove(recordedAudioLegacy);
 
     Loader::get()->queueInMainThread([] {
       Notification::create("Render Saved With Audio", NotificationIcon::Success)
