@@ -4,7 +4,7 @@
 #include <Geode/modify/PlayLayer.hpp>
 
 class $modify(LevelTools) {
-    static bool verifyLevelIntegrity(gd::string v1, int v2) {
+    static bool verifyLevelIntegrity(std::string v1, int v2) {
         if (Global::get().layoutMode) return true;
         return LevelTools::verifyLevelIntegrity(v1, v2);
     }
@@ -29,13 +29,13 @@ class $modify(PlayLayer) {
         obj->setVisible(obj->m_objectID != 2065);
     }
 
-    bool init(GJGameLevel * level, bool b1, bool b2) {
+    bool init(GJGameLevel * level, bool b1) {
         auto& g = Global::get();
 
 #if defined(GEODE_IS_ANDROID) || defined(GEODE_IS_IOS)
 
         if (robtopLevelIDs.contains(level->m_levelID.value()))
-            return PlayLayer::init(level, b1, b2);
+            return PlayLayer::init(level, b1);
 
 #endif
 
@@ -45,7 +45,7 @@ class $modify(PlayLayer) {
         if (g.layoutMode)
             level->m_levelString = LayoutMode::getModifiedString(level->m_levelString);
 
-        if (!PlayLayer::init(level, b1, b2)) {
+        if (!PlayLayer::init(level, b1)) {
             if (g.layoutMode)
                 level->m_levelString = oldString;
 

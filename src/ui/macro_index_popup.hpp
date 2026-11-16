@@ -818,7 +818,7 @@ private:
   // Download macro
   // ========================================================
 
-  void finishDownload(std::filesystem::path const &temporary, bool ok,
+  void finishDownload(asp::fs::Path const &temporary, bool ok,
                       std::string const &text) {
     downloading = false;
 
@@ -828,8 +828,7 @@ private:
     }
 
     if (!ok) {
-      std::error_code ec;
-      std::filesystem::remove(temporary, ec);
+      wbfs::remove(temporary);
     }
 
     Notification::create(text, ok ? NotificationIcon::Success
@@ -859,12 +858,10 @@ private:
       return;
     }
 
-    auto folder = Mod::get()->getSettingValue<std::filesystem::path>(
+    auto folder = Mod::get()->getSettingValue<asp::fs::Path>(
         "macros_folder");
 
-    try {
-      std::filesystem::create_directories(folder);
-    } catch (...) {
+    if (!wbfs::createDirs(folder)) {
       Notification::create("Failed to create macros folder.",
                            NotificationIcon::Error)
           ->show();
@@ -874,17 +871,17 @@ private:
     std::string filename = sanitizeFilename(entry.levelName);
     std::string extension = getExtension(entry.format);
 
-    std::filesystem::path output = folder / (filename + extension);
+    asp::fs::Path output = folder / (filename + extension);
 
     int collision = 1;
 
-    while (std::filesystem::exists(output)) {
+    while (asp::fs::exists(output)) {
       output = folder / fmt::format("{} ({}){}", filename, collision,
                                     extension);
       ++collision;
     }
 
-    std::filesystem::path temporary = output;
+    asp::fs::Path temporary = output;
     temporary += ".part";
 
     downloading = true;
@@ -912,24 +909,21 @@ private:
             return;
           }
 
-          std::error_code ec;
-          auto size = std::filesystem::file_size(temporary, ec);
+          auto size = wbfs::fileSize(temporary);
 
-          if (ec || size == 0) {
+          if (!size || *size == 0) {
             finishDownload(temporary, false, "Downloaded file is empty.");
             return;
           }
 
-          std::filesystem::rename(temporary, output, ec);
-
-          if (ec) {
+          if (!wbfs::rename(temporary, output)) {
             finishDownload(temporary, false, "Failed to finalize macro file.");
             return;
           }
 
           finishDownload(temporary, true,
                          fmt::format("Downloaded: {}",
-                                     output.filename().string()));
+                                     wbfs::filename(output)));
         });
   }
 

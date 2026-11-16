@@ -97,7 +97,7 @@ void Macro::autoSave(GJGameLevel* level, int number) {
     std::string levelname = level->m_levelName;
 
     auto autoSavesPath =
-        Mod::get()->getSettingValue<std::filesystem::path>(
+        Mod::get()->getSettingValue<asp::fs::Path>(
             "autosaves_folder"
         );
 
@@ -109,7 +109,7 @@ void Macro::autoSave(GJGameLevel* level, int number) {
             number
         );
 
-    if (!std::filesystem::exists(autoSavesPath))
+    if (!asp::fs::exists(autoSavesPath))
         return;
 
     std::string username =
@@ -159,11 +159,11 @@ void Macro::tryAutosave(
         return;
 
     auto autoSavesPath =
-        g.mod->getSettingValue<std::filesystem::path>(
+        g.mod->getSettingValue<asp::fs::Path>(
             "autosaves_folder"
         );
 
-    if (!std::filesystem::exists(autoSavesPath)) {
+    if (!asp::fs::exists(autoSavesPath)) {
         log::debug("Failed to access auto saves path.");
         return;
     }
@@ -181,22 +181,12 @@ void Macro::tryAutosave(
     // Replace this session's previous autosave. Macro::saveWBR never overwrites (it appends " (n)" to an
     // existing name), so the old file must be removed first. The legacy .gdr name is removed too, for sessions
     // that were autosaving before the switch to WBR.
-    std::error_code ec;
+    auto previousWbr = path.string() + ".wbr";
 
-    std::filesystem::remove(
-        path.string() + ".wbr",
-        ec
-    );
-
-    if (ec)
+    if (asp::fs::exists(previousWbr) && !wbfs::remove(previousWbr))
         log::warn("Failed to remove previous autosave");
 
-    std::error_code legacyEc;
-
-    std::filesystem::remove(
-        path.string() + ".gdr",
-        legacyEc
-    );
+    wbfs::remove(path.string() + ".gdr");
 
     autoSave(
         level,
@@ -305,7 +295,7 @@ int Macro::save(
 
     int iterations = 0;
 
-    while (std::filesystem::exists(path + extension)) {
+    while (asp::fs::exists(path + extension)) {
         iterations++;
 
         if (iterations > 1) {
@@ -339,23 +329,15 @@ int Macro::save(
     g.macro.lastRecordedFrame =
         g.macro.inputs.back().frame;
 
-#ifdef GEODE_IS_WINDOWS
-    std::wstring widePath =
-        Utils::widen(path);
+    auto stdPath = wbfs::toStd(path);
 
-    if (widePath == L"Widen Error")
+    if (stdPath.empty())
         return 30;
 
     std::ofstream f(
-        widePath,
+        stdPath,
         std::ios::binary
     );
-#else
-    std::ofstream f(
-        path,
-        std::ios::binary
-    );
-#endif
 
     if (!f)
         f.open(path, std::ios::binary);
@@ -401,7 +383,7 @@ int Macro::saveGDR2(
     std::string extension = ".gdr2";
     int iterations = 0;
 
-    while (std::filesystem::exists(path + extension)) {
+    while (asp::fs::exists(path + extension)) {
         iterations++;
 
         if (iterations > 1) {
@@ -435,23 +417,15 @@ int Macro::saveGDR2(
     g.macro.lastRecordedFrame =
         g.macro.inputs.back().frame;
 
-#ifdef GEODE_IS_WINDOWS
-    std::wstring widePath =
-        Utils::widen(path);
+    auto stdPath = wbfs::toStd(path);
 
-    if (widePath == L"Widen Error")
+    if (stdPath.empty())
         return 30;
 
     std::ofstream f(
-        widePath,
+        stdPath,
         std::ios::binary
     );
-#else
-    std::ofstream f(
-        path,
-        std::ios::binary
-    );
-#endif
 
     if (!f)
         f.open(path, std::ios::binary);
@@ -485,7 +459,7 @@ int Macro::saveGDR2(
 }
 
 bool Macro::loadXDFile(
-    std::filesystem::path path
+    asp::fs::Path path
 ) {
     Macro newMacro =
         Macro::XDtoGDR(path);
@@ -500,7 +474,7 @@ bool Macro::loadXDFile(
 }
 
 Macro Macro::XDtoGDR(
-    std::filesystem::path path
+    asp::fs::Path path
 ) {
     Macro newMacro;
 
@@ -508,13 +482,7 @@ Macro Macro::XDtoGDR(
     newMacro.description = "N/A";
     newMacro.gameVersion = GEODE_GD_VERSION;
 
-#ifdef GEODE_IS_WINDOWS
-    std::ifstream file(
-        Utils::widen(path.string())
-    );
-#else
-    std::ifstream file(path);
-#endif
+    std::ifstream file(wbfs::toStd(path));
 
     if (!file.is_open()) {
         newMacro.description = "fail";
@@ -753,9 +721,9 @@ std::vector<std::uint8_t> exportWith(
 }
 
 std::string lowerExtension(
-    std::filesystem::path const& path
+    asp::fs::Path const& path
 ) {
-    std::string ext = path.extension().string();
+    std::string ext = wbfs::extension(path);
 
     for (char& c : ext)
         c = static_cast<char>(
@@ -766,18 +734,18 @@ std::string lowerExtension(
 }
 
 bool readAllBytes(
-    std::filesystem::path const& path,
+    asp::fs::Path const& path,
     std::vector<std::uint8_t>& out,
     std::string& error
 ) {
-    std::error_code ec;
+    auto const sizeResult = asp::fs::fileSize(path);
 
-    auto const size = std::filesystem::file_size(path, ec);
-
-    if (ec) {
-        error = "cannot read the file (" + ec.message() + ")";
+    if (sizeResult.isErr()) {
+        error = "cannot read the file (" + std::string(sizeResult.unwrapErr().message()) + ")";
         return false;
     }
+
+    auto const size = sizeResult.unwrap();
 
     if (size == 0) {
         error = "the file is empty";
@@ -789,7 +757,7 @@ bool readAllBytes(
         return false;
     }
 
-    std::ifstream file(path, std::ios::binary);
+    std::ifstream file(wbfs::toStd(path), std::ios::binary);
 
     if (!file) {
         error = "cannot open the file";
@@ -814,7 +782,7 @@ bool readAllBytes(
 } // namespace
 
 Macro::LoadResult Macro::readFile(
-    std::filesystem::path const& path,
+    asp::fs::Path const& path,
     Macro& out
 ) {
     LoadResult result;
@@ -824,7 +792,7 @@ Macro::LoadResult Macro::readFile(
     // The XD / SLC loaders install the macro into Global. Keep the current macro intact so that loading for a
     // merge (or a failed load) never changes it.
     auto viaGlobal = [&](
-        bool (*loader)(std::filesystem::path),
+        bool (*loader)(asp::fs::Path),
         int id,
         char const* failure
     ) {
@@ -882,8 +850,8 @@ Macro::LoadResult Macro::readFile(
 }
 
 Macro::ImportResult Macro::importToFolder(
-    std::filesystem::path const& source,
-    std::filesystem::path const& folder
+    asp::fs::Path const& source,
+    asp::fs::Path const& folder
 ) {
     ImportResult result;
     Macro macro;
@@ -947,21 +915,20 @@ Macro::ImportResult Macro::importToFolder(
     }
 
     // "a.gdr.json" -> "a": the same rule the macro list uses for .json files
-    std::string name = source.stem().string();
+    std::string name = wbfs::stem(source);
 
     if (ext == ".json" && name.size() > 4 &&
         name.compare(name.size() - 4, 4, ".gdr") == 0)
         name.resize(name.size() - 4);
 
-    std::error_code ec;
-    std::filesystem::create_directories(folder, ec);
+    wbfs::createDirs(folder);
 
-    std::filesystem::path target = folder / (name + extension);
+    asp::fs::Path target = folder / (name + extension);
 
-    for (int i = 1; std::filesystem::exists(target, ec); i++)
+    for (int i = 1; asp::fs::exists(target); i++)
         target = folder / (name + " (" + std::to_string(i) + ")" + extension);
 
-    std::ofstream out(target, std::ios::binary);
+    std::ofstream out(wbfs::toStd(target), std::ios::binary);
 
     if (out)
         out.write(
@@ -971,7 +938,7 @@ Macro::ImportResult Macro::importToFolder(
 
     if (!out) {
         out.close();
-        std::filesystem::remove(target, ec);
+        wbfs::remove(target);
 
         result.errorId = 47;
         result.message = "the macro could not be written to the macros folder";
@@ -1073,7 +1040,7 @@ int Macro::saveWBR(
     std::string extension = ".wbr";
     int iterations = 0;
 
-    while (std::filesystem::exists(path + extension)) {
+    while (asp::fs::exists(path + extension)) {
         iterations++;
 
         if (iterations > 1) {
@@ -1107,23 +1074,15 @@ int Macro::saveWBR(
     g.macro.lastRecordedFrame =
         g.macro.inputs.back().frame;
 
-#ifdef GEODE_IS_WINDOWS
-    std::wstring widePath =
-        Utils::widen(path);
+    auto stdPath = wbfs::toStd(path);
 
-    if (widePath == L"Widen Error")
+    if (stdPath.empty())
         return 30;
 
     std::ofstream f(
-        widePath,
+        stdPath,
         std::ios::binary
     );
-#else
-    std::ofstream f(
-        path,
-        std::ios::binary
-    );
-#endif
 
     if (!f)
         f.open(path, std::ios::binary);
@@ -1175,7 +1134,7 @@ int Macro::saveSLC2(
     std::string extension = ".slc2";
     int iterations = 0;
 
-    while (std::filesystem::exists(path + extension)) {
+    while (asp::fs::exists(path + extension)) {
         ++iterations;
 
         if (iterations > 1) {
@@ -1297,23 +1256,15 @@ int Macro::saveSLC2(
         }
     }
 
-#ifdef GEODE_IS_WINDOWS
-    std::wstring widePath =
-        Utils::widen(path);
+    auto stdPath = wbfs::toStd(path);
 
-    if (widePath == L"Widen Error")
+    if (stdPath.empty())
         return 30;
 
     std::ofstream file(
-        widePath,
+        stdPath,
         std::ios::binary
     );
-#else
-    std::ofstream file(
-        path,
-        std::ios::binary
-    );
-#endif
 
     if (!file)
         file.open(
@@ -1355,19 +1306,12 @@ int Macro::saveSLC2(
 }
 
 bool Macro::loadSLC2(
-    std::filesystem::path path
+    asp::fs::Path path
 ) {
-#ifdef GEODE_IS_WINDOWS
     std::ifstream file(
-        Utils::widen(path.string()),
+        wbfs::toStd(path),
         std::ios::binary
     );
-#else
-    std::ifstream file(
-        path,
-        std::ios::binary
-    );
-#endif
 
     if (!file) {
         log::error(
@@ -1514,7 +1458,7 @@ int Macro::saveSLC3(
     std::string extension = ".slc3";
     int iterations = 0;
 
-    while (std::filesystem::exists(path + extension)) {
+    while (asp::fs::exists(path + extension)) {
         ++iterations;
 
         if (iterations > 1) {
@@ -1656,23 +1600,15 @@ int Macro::saveSLC3(
         }
     );
 
-#ifdef GEODE_IS_WINDOWS
-    std::wstring widePath =
-        Utils::widen(path);
+    auto stdPath = wbfs::toStd(path);
 
-    if (widePath == L"Widen Error")
+    if (stdPath.empty())
         return 30;
 
     std::ofstream file(
-        widePath,
+        stdPath,
         std::ios::binary
     );
-#else
-    std::ofstream file(
-        path,
-        std::ios::binary
-    );
-#endif
 
     if (!file)
         file.open(
@@ -1714,19 +1650,12 @@ int Macro::saveSLC3(
 }
 
 bool Macro::loadSLC3(
-    std::filesystem::path path
+    asp::fs::Path path
 ) {
-#ifdef GEODE_IS_WINDOWS
     std::ifstream file(
-        Utils::widen(path.string()),
+        wbfs::toStd(path),
         std::ios::binary
     );
-#else
-    std::ifstream file(
-        path,
-        std::ios::binary
-    );
-#endif
 
     if (!file) {
         log::error(

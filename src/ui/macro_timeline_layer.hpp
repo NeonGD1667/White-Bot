@@ -4,7 +4,7 @@
 
 #include <Geode/ui/GeodeUI.hpp>
 
-class MacroTimelineLayer : public geode::Popup, public TextInputDelegate {
+class MacroTimelineLayer : public geode::Popup {
 private:
   bool setup();
   void onClose(CCObject *) override;

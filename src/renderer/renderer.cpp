@@ -134,7 +134,7 @@ class $modify(EndLevelLayer) {
 
 class $modify(FMODAudioEngine) {
 
-  void playEffect(gd::string path, float speed, float p2, float volume) {
+  void playEffect(std::string path, float speed, float p2, float volume) {
     if (path == "explode_11.ogg" && Global::get().renderer.recording)
       return;
 
@@ -199,8 +199,11 @@ class $modify(CCScheduler) {
   }
 };
 
+// true: embedded ffmpeg (wbffmpeg). false: Legacy Render (pipe to ffmpeg.exe, Windows only).
 bool Renderer::shouldUseAPI() {
-#ifdef GEODE_IS_MOBILE
+#ifdef GEODE_IS_WINDOWS
+  return !Mod::get()->getSettingValue<bool>("render_legacy");
+#elif defined(WB_FFMPEG_EMBEDDED)
   return true;
 #else
   return false;
@@ -209,11 +212,11 @@ bool Renderer::shouldUseAPI() {
 
 bool Renderer::toggle() {
   auto &g = Global::get();
-  bool foundApi = Loader::get()->isModLoaded("eclipse.ffmpeg-api");
-  std::filesystem::path ffmpegPath =
-      Mod::get()->getSettingValue<std::filesystem::path>("ffmpeg_path");
-  bool foundExe = std::filesystem::exists(ffmpegPath) &&
-                  ffmpegPath.filename().string() == "ffmpeg.exe";
+  [[maybe_unused]] bool foundApi = wbffmpeg::isAvailable();
+  asp::fs::Path ffmpegPath =
+      Mod::get()->getSettingValue<asp::fs::Path>("ffmpeg_path");
+  bool foundExe = asp::fs::exists(ffmpegPath) &&
+                  wbfs::filename(ffmpegPath) == "ffmpeg.exe";
 
   g.renderer.usingApi = Renderer::shouldUseAPI();
 
@@ -222,36 +225,43 @@ bool Renderer::toggle() {
                               : g.renderer.stop(Global::getCurrentFrame());
   } else {
 
+    if (!g.renderer.usingApi) {
 #ifdef GEODE_IS_WINDOWS
-    if (!foundExe && !foundApi) {
-      geode::createQuickPopup(
-          "Error",
-          "<cl>FFmpeg</c> not found, set the path to the .exe in mod settings "
-          "or install FFmpeg API.\nOpen download link?",
-          "Cancel", "Yes", [](auto, bool btn2) {
-            if (btn2) {
-              FLAlertLayer::create("Info",
-                                   "Unzip the downloaded file and look for "
-                                   "<cl>ffmpeg.exe</c> in the 'bin' folder.",
-                                   "Ok")
-                  ->show();
-              utils::web::openLinkInBrowser("https://www.gyan.dev/ffmpeg/"
-                                            "builds/ffmpeg-git-essentials.7z");
-            }
-          });
-      return false;
-    }
+      // Legacy Render: pipes frames to ffmpeg.exe
+      if (!foundExe) {
+        geode::createQuickPopup(
+            "Error",
+            "<cl>FFmpeg</c> not found, set the path to the .exe in mod "
+            "settings (Legacy Render), or turn Legacy Render off.\nOpen "
+            "download link?",
+            "Cancel", "Yes", [](auto, bool btn2) {
+              if (btn2) {
+                FLAlertLayer::create("Info",
+                                     "Unzip the downloaded file and look for "
+                                     "<cl>ffmpeg.exe</c> in the 'bin' folder.",
+                                     "Ok")
+                    ->show();
+                utils::web::openLinkInBrowser(
+                    "https://www.gyan.dev/ffmpeg/"
+                    "builds/ffmpeg-git-essentials.7z");
+              }
+            });
+        return false;
+      }
 
-    g.renderer.ffmpegPath = ffmpegPath.string();
+      g.renderer.ffmpegPath = ffmpegPath.string();
 #else
-    if (!foundApi) {
       FLAlertLayer::create(
-          "Error",
-          "<cl>FFmpeg API</c> not found. Download it to render a level.", "Ok")
+          "Error", "Rendering is not supported on this platform yet.", "Ok")
+          ->show();
+      return false;
+#endif
+    } else if (!foundApi) {
+      FLAlertLayer::create(
+          "Error", "No ffmpeg backend is available on this platform.", "Ok")
           ->show();
       return false;
     }
-#endif
 
     if (!PlayLayer::get()) {
       FLAlertLayer::create("Warning",
@@ -260,10 +270,10 @@ bool Renderer::toggle() {
       return false;
     }
 
-    std::filesystem::path path =
-        Mod::get()->getSettingValue<std::filesystem::path>("render_folder");
+    asp::fs::Path path =
+        Mod::get()->getSettingValue<asp::fs::Path>("render_folder");
 
-    if (std::filesystem::exists(path))
+    if (asp::fs::exists(path))
       g.renderer.start();
     else {
       if (utils::file::createDirectoryAll(path).isOk())
@@ -302,7 +312,9 @@ void Renderer::start() {
                   .unwrapOr(0.f);
   audioMode = AudioMode::Off;
 #ifdef GEODE_IS_WINDOWS
-  bool renderHDR = mod->getSavedValue<bool>("render_hdr");
+  // HDR extra args only exist in Legacy Render (ffmpeg.exe command line).
+  bool renderHDR =
+      !Renderer::shouldUseAPI() && mod->getSavedValue<bool>("render_hdr");
 #else
   bool renderHDR = false;
 #endif
@@ -353,7 +365,7 @@ void Renderer::start() {
       fmt::format("render_{}_{}{}", std::string_view(pl->m_level->m_levelName),
                   std::to_string(timestamp), extension);
   std::string path =
-      (Mod::get()->getSettingValue<std::filesystem::path>("render_folder") /
+      (Mod::get()->getSettingValue<asp::fs::Path>("render_folder") /
        filename)
           .string();
 
@@ -408,7 +420,7 @@ void Renderer::start() {
   renderer.begin();
   changeRes(false);
 
-#ifdef GEODE_IS_MOBILE
+#ifdef WB_FFMPEG_EMBEDDED
   ffmpeg::RenderSettings settings;
   settings.m_pixelFormat = ffmpeg::PixelFormat::RGB24;
   settings.m_codec = codec;
@@ -440,7 +452,7 @@ void Renderer::start() {
 
   std::thread([&, path, songFile, songOffset, fadeIn, fadeOut, extension,
                renderHDR, bitrateApi
-#ifdef GEODE_IS_MOBILE
+#ifdef WB_FFMPEG_EMBEDDED
                ,
                settings
 #endif
@@ -482,7 +494,7 @@ void Renderer::start() {
       fadeArgs = fmt::format(",fade=t=in:st=0:d={}", fadeInTime);
 
     if (usingApi) {
-#ifdef GEODE_IS_MOBILE
+#ifdef WB_FFMPEG_EMBEDDED
       auto initSettings = settings;
       auto res = ffmpeg.init(initSettings);
       if (res.isErr() && !initSettings.m_colorspaceFilters.empty()) {
@@ -556,7 +568,7 @@ void Renderer::start() {
 
       if (popped) {
         if (usingApi) {
-#ifdef GEODE_IS_MOBILE
+#ifdef WB_FFMPEG_EMBEDDED
           auto res = ffmpeg.writeFrame(frame);
           if (res.isErr()) {
             Loader::get()->queueInMainThread([] {
@@ -583,7 +595,7 @@ void Renderer::start() {
     }
 
     if (usingApi) {
-#ifdef GEODE_IS_MOBILE
+#ifdef WB_FFMPEG_EMBEDDED
       ffmpeg.stop();
 #endif
     } else {
@@ -606,28 +618,26 @@ void Renderer::start() {
     });
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-    std::filesystem::path recordedAudioFile =
+    asp::fs::Path recordedAudioFile =
         Mod::get()->getSaveDir() / "fmodoutput.wav";
-    std::filesystem::path recordedAudioLegacy = "fmodoutput.wav";
+    asp::fs::Path recordedAudioLegacy = "fmodoutput.wav";
 
-    if (!std::filesystem::exists(recordedAudioFile) &&
-        std::filesystem::exists(recordedAudioLegacy)) {
-      std::error_code moveEc;
-      std::filesystem::rename(recordedAudioLegacy, recordedAudioFile, moveEc);
-      if (moveEc)
+    if (!asp::fs::exists(recordedAudioFile) &&
+        asp::fs::exists(recordedAudioLegacy)) {
+      if (!wbfs::rename(recordedAudioLegacy, recordedAudioFile))
         recordedAudioFile = recordedAudioLegacy;
     }
 
     if (audioMode == AudioMode::Record &&
-        !std::filesystem::exists(recordedAudioFile) &&
-        std::filesystem::exists(songFile))
+        !asp::fs::exists(recordedAudioFile) &&
+        asp::fs::exists(songFile))
       audioMode = AudioMode::Song;
 
     if ((SFXVolume == 0.f && musicVolume == 0.f) ||
         audioMode == AudioMode::Off ||
-        (audioMode == AudioMode::Song && !std::filesystem::exists(songFile)) ||
+        (audioMode == AudioMode::Song && !asp::fs::exists(songFile)) ||
         (audioMode == AudioMode::Record &&
-         !std::filesystem::exists(recordedAudioFile))) {
+         !asp::fs::exists(recordedAudioFile))) {
       if (audioMode != AudioMode::Off) {
         Loader::get()->queueInMainThread([] {
           FLAlertLayer::create("Error", "Audio file not found.", "Ok")->show();
@@ -650,18 +660,17 @@ void Renderer::start() {
       return;
     }
 
-    std::filesystem::path tempPath =
-        std::filesystem::path(path).parent_path() /
-        ("temp_" + std::filesystem::path(path).filename().string());
-    std::filesystem::path tempPathAudio =
+    asp::fs::Path tempPath =
+        wbfs::parent(path) / ("temp_" + wbfs::filename(path));
+    asp::fs::Path tempPathAudio =
         (Mod::get()->getSaveDir() / "temp_audio_file.wav");
 
     if (usingApi) {
-#ifdef GEODE_IS_MOBILE
+#ifdef WB_FFMPEG_EMBEDDED
       std::string file =
           audioMode == AudioMode::Song ? songFile : recordedAudioFile.string();
-      auto res = ffmpeg::events::AudioMixer::mixVideoAudio(
-    path, file, tempPath
+      auto res = wbffmpeg::Mixer::mixVideoAudio(
+    path, file, wbfs::toStd(tempPath)
 );
       log::debug("XD");
       if (res.isErr()) {
@@ -690,16 +699,10 @@ void Renderer::start() {
         log::info("Executing (Fade Out): {}", command);
         process = subprocess::Popen(command);
         if (!process.close()) {
-          std::error_code ec;
-          std::filesystem::remove(path, ec);
-          if (ec)
+          if (asp::fs::exists(path) && !wbfs::remove(path))
             log::warn("Failed to remove old render file.");
-          else {
-            ec.clear();
-            std::filesystem::rename(path + "_temp" + extension, path, ec);
-            if (ec)
-              log::warn("Failed to rename temp render file.");
-          }
+          else if (!wbfs::rename(path + "_temp" + extension, path))
+            log::warn("Failed to rename temp render file.");
         } else
           log::debug("Fade Out Error xD");
       }
@@ -708,7 +711,7 @@ void Renderer::start() {
         command =
             fmt::format("\"{}\" -i \"{}\" -acodec pcm_s16le "
                         "-ar 44100 -ac 2 \"{}\"",
-                        ffmpegPath, recordedAudioFile.string(), tempPathAudio);
+                        ffmpegPath, recordedAudioFile.string(), tempPathAudio.string());
 
         process = subprocess::Popen(command); // Fix ffmpeg not reading it
         if (process.close()) {
@@ -736,8 +739,8 @@ void Renderer::start() {
               fadeOutVideo ? std::to_string(fadeOutTime) : "2",
               fadeOutVideo ? fadeOutStart : totalTime - timeAfter - 3.5f);
 
-        std::filesystem::path file =
-            audioMode == AudioMode::Song ? songFile : tempPathAudio;
+        std::string file =
+            audioMode == AudioMode::Song ? songFile : tempPathAudio.string();
         float offset = audioMode == AudioMode::Song
                            ? songOffset
                            : (isPlatformer ? 0.28f : 0.f);
@@ -753,7 +756,7 @@ void Renderer::start() {
             "\"{}\" -y -ss {} -i \"{}\" -i \"{}\" -t {} -c:v copy {} -filter:a "
             "\"[1:a]adelay=0|0{}{}{}\" \"{}\"",
             ffmpegPath, offset, file, path, totalTime, extraAudioArgs,
-            fadeInString, fadeOutString, volume, tempPath);
+            fadeInString, fadeOutString, volume, tempPath.string());
 
         log::info("Executing (Audio): {}", command);
 
@@ -772,29 +775,18 @@ void Renderer::start() {
 #endif
     }
 
-    std::error_code ec;
-    std::filesystem::remove(Utils::widen(path), ec);
-    if (ec)
+    if (asp::fs::exists(path) && !wbfs::remove(path))
       log::warn("Failed to remove old render file.");
-    else {
-      ec.clear();
-      std::filesystem::rename(tempPath, Utils::widen(path), ec);
-      if (ec)
-        log::warn("Failed to rename temp render file.");
-    }
+    else if (!wbfs::rename(tempPath, path))
+      log::warn("Failed to rename temp render file.");
 
-    ec.clear();
-    std::filesystem::remove(tempPathAudio, ec);
-    if (ec)
+    if (asp::fs::exists(tempPathAudio) && !wbfs::remove(tempPathAudio))
       log::warn("Failed to remove temp audio file.");
 
-    ec.clear();
-    std::filesystem::remove(recordedAudioFile, ec);
-    if (ec)
+    if (asp::fs::exists(recordedAudioFile) && !wbfs::remove(recordedAudioFile))
       log::warn("Failed to remove fmod audio file.");
 
-    ec.clear();
-    std::filesystem::remove(recordedAudioLegacy, ec);
+    wbfs::remove(recordedAudioLegacy);
 
     Loader::get()->queueInMainThread([] {
       Notification::create("Render Saved With Audio", NotificationIcon::Success)

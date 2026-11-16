@@ -2,7 +2,10 @@
 
 #include <Geode/platform/cplatform.h>
 
-#ifdef GEODE_IS_WINDOWS
+#if defined(WB_FFMPEG_EMBEDDED)
+    // ffmpeg is embedded into White Bot: nothing is exported from the mod binary.
+    #define FFMPEG_API_DLL
+#elif defined(GEODE_IS_WINDOWS)
     #ifdef FFMPEG_API_EXPORTING
         #define FFMPEG_API_DLL __declspec(dllexport)
     #else

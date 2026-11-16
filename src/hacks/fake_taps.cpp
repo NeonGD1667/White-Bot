@@ -1,5 +1,6 @@
 #include "fake_taps.hpp"
 
+#include <algorithm>
 #include <unordered_map>
 #include <Geode/modify/CCEGLView.hpp>
 #include <Geode/modify/CCDirector.hpp>
@@ -19,9 +20,33 @@ std::unordered_map<int, FakeTouch> g_fakeTouches;
 constexpr int FAKE_P1 = 0;
 constexpr int FAKE_P2 = 1;
 
+// Cached copy of the Faketaps settings (see FakeTapsSettingsLayer).
+bool g_settingsLoaded = false;
+float g_scale = 0.5f;
+ccColor3B g_color = {255, 255, 255};
+
+void loadSettings() {
+    g_scale = std::clamp(
+        Mod::get()->getSavedValue<float>("faketaps_scale", 0.5f),
+        0.1f,
+        5.f
+    );
+
+    g_color = Mod::get()->getSavedValue<ccColor3B>(
+        "faketaps_color",
+        ccColor3B{255, 255, 255}
+    );
+
+    g_settingsLoaded = true;
+}
+
 void renderFakeTouches() {
-    if (!Mod::get()->getSavedValue<bool>("faketaps"))
+    if (!Mod::get()->getSavedValue<bool>("faketaps")) {
+        // Drop leftovers so a touch that was held when the setting was turned off
+        // does not reappear when it is turned back on.
+        g_fakeTouches.clear();
         return;
+    }
 
     if (g_fakeTouches.empty())
         return;
@@ -31,13 +56,14 @@ void renderFakeTouches() {
 
     constexpr float fadeSpeed = 6.f;
     constexpr float maxOpacity = 0.5f;
-    constexpr float scale = 0.5f;
+    if (!g_settingsLoaded)
+        loadSettings();
 
     int radius =
-        static_cast<int>(scale * 16.f);
+        std::max(1, static_cast<int>(g_scale * 16.f));
 
     int segments =
-        static_cast<int>(scale * 32.f);
+        std::max(8, static_cast<int>(g_scale * 32.f));
 
     ccGLBlendFunc(
         GL_SRC_ALPHA,
@@ -71,9 +97,9 @@ void renderFakeTouches() {
             continue;
 
         ccDrawColor4B(
-            255,
-            255,
-            255,
+            g_color.r,
+            g_color.g,
+            g_color.b,
             static_cast<GLubyte>(
                 touch.opacity * 255.f
             )
@@ -94,11 +120,24 @@ void FakeTaps::press(
     int player,
     CCPoint const& position
 ) {
+    auto it = g_fakeTouches.find(player);
+
+    if (it != g_fakeTouches.end()) {
+        // Pressed again while the circle is still fading: keep its opacity (no flicker).
+        it->second.position = position;
+        it->second.released = false;
+        return;
+    }
+
     g_fakeTouches[player] = {
         position,
         0.f,
         false
     };
+}
+
+void FakeTaps::reloadSettings() {
+    loadSettings();
 }
 
 void FakeTaps::release(int player) {

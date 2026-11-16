@@ -61,15 +61,14 @@ bool Global::hasIncompatibleMods() {
 #ifdef GEODE_IS_WINDOWS
 
   if (Mod *mod = Loader::get()->getLoadedMod("tobyadd.gdh")) {
-    std::filesystem::path configPath = mod->getSaveDir() / "config.json";
+    asp::fs::Path configPath = mod->getSaveDir() / "config.json";
     using namespace nlohmann;
 
-    if (std::filesystem::exists(configPath)) {
-      std::ifstream jsonFile(configPath);
-      if (jsonFile.is_open()) {
-        json jsonData;
-        jsonFile >> jsonData;
-        if (jsonData.contains("tps_enabled")) {
+    if (asp::fs::exists(configPath)) {
+      auto content = asp::fs::readToString(configPath);
+      if (content.isOk()) {
+        json jsonData = json::parse(content.unwrap(), nullptr, false);
+        if (!jsonData.is_discarded() && jsonData.contains("tps_enabled")) {
           if (jsonData["tps_enabled"])
             settingsToDisable.push_back("<cr>TPS Bypass (GDH)</c>");
         }
@@ -80,15 +79,14 @@ bool Global::hasIncompatibleMods() {
 #else
 
   if (Mod *mod = Loader::get()->getLoadedMod("tobyadd.gdh_mobile")) {
-    std::filesystem::path configPath = mod->getSaveDir() / "config.json";
+    asp::fs::Path configPath = mod->getSaveDir() / "config.json";
     using namespace nlohmann;
 
-    if (std::filesystem::exists(configPath)) {
-      std::ifstream jsonFile(configPath);
-      if (jsonFile.is_open()) {
-        json jsonData;
-        jsonFile >> jsonData;
-        if (jsonData.contains("fps_value")) {
+    if (asp::fs::exists(configPath)) {
+      auto content = asp::fs::readToString(configPath);
+      if (content.isOk()) {
+        json jsonData = json::parse(content.unwrap(), nullptr, false);
+        if (!jsonData.is_discarded() && jsonData.contains("fps_value")) {
           if (jsonData["fps_value"] != 240)
             settingsToDisable.push_back("<cr>TPS Bypass (GDH)</c>");
         }
@@ -425,9 +423,9 @@ $execute {
   }
 
   if (!g.mod->setSavedValue("defaults_set_12", true)) {
-    g.mod->setSettingValue<std::filesystem::path>(
+    g.mod->setSettingValue<asp::fs::Path>(
         "macros_folder", g.mod->getSaveDir() / "macros");
-    g.mod->setSettingValue<std::filesystem::path>(
+    g.mod->setSettingValue<asp::fs::Path>(
         "autosaves_folder", g.mod->getSaveDir() / "autosaves");
   }
 
@@ -469,7 +467,7 @@ $execute {
   }
 
   if (!g.mod->setSavedValue("defaults_set3", true)) {
-    g.mod->setSettingValue<std::filesystem::path>(
+    g.mod->setSettingValue<asp::fs::Path>(
         "render_folder", g.mod->getSaveDir() / "renders");
     g.mod->setSavedValue("render_file_extension", std::string(".mp4"));
     g.mod->setSavedValue("render_sfx_volume", 1.f);

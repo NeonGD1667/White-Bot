@@ -2,8 +2,7 @@
 
 #include "../includes.hpp"
 
-class AutoSwiftClickSettingsLayer : public geode::Popup,
-                                    public TextInputDelegate {
+class AutoSwiftClickSettingsLayer : public geode::Popup {
 
 private:
   TextInput *countInput = nullptr;

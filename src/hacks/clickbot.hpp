@@ -6,7 +6,7 @@ const std::unordered_map<int, std::string> buttonInts = { {1, "click"}, {2, "lef
 
 struct ClickSetting {
     bool disabled = false;
-    std::filesystem::path path;
+    asp::fs::Path path;
     int volume = 100;
     float pitch = 1.f;
 };
@@ -17,7 +17,7 @@ struct matjson::Serialize<ClickSetting> {
         ClickSetting setts;
 
         setts.disabled = value["disabled"].asBool().unwrapOr(true);
-        setts.path = std::filesystem::path(value["path"].asString().unwrapOrDefault());
+        setts.path = asp::fs::Path(value["path"].asString().unwrapOrDefault());
         setts.volume = value["volume"].asInt().unwrapOrDefault();
         setts.pitch = static_cast<float>(value["pitch"].asDouble().unwrapOrDefault());
 

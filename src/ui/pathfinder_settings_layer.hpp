@@ -4,7 +4,7 @@
 
 #include <algorithm>
 
-class PathFinderSettingsLayer : public geode::Popup, public TextInputDelegate {
+class PathFinderSettingsLayer : public geode::Popup {
 private:
   TextInput *stepInput = nullptr;
   TextInput *shiftInput = nullptr;

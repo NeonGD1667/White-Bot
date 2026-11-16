@@ -5,6 +5,7 @@
 #include <Geode/Result.hpp>
 
 #include <filesystem>
+#include <span>
 
 BEGIN_FFMPEG_NAMESPACE_V
 

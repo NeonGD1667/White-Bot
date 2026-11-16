@@ -145,12 +145,12 @@ class $modify(PlayLayer) {
         PlayLayer::pauseGame(b1);
     }
 
-    bool init(GJGameLevel* level, bool b1, bool b2) {
+    bool init(GJGameLevel* level, bool b1) {
         auto& g = Global::get();
 
         g.firstAttempt = true;
 
-        if (!PlayLayer::init(level, b1, b2))
+        if (!PlayLayer::init(level, b1))
             return false;
 
         Global::updateKeybinds();

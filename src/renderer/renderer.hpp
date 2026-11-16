@@ -1,6 +1,6 @@
 #include "../includes.hpp"
-#ifdef GEODE_IS_MOBILE
-#include "ffmpeg/events.hpp"
+#include "ffmpeg/backend.hpp"
+#ifdef WB_FFMPEG_EMBEDDED
 #include "ffmpeg/render_settings.hpp"
 #endif
 
@@ -54,8 +54,8 @@ public:
   int pauseAttempts = 0;
 
   MyRenderTexture renderer;
-#ifdef GEODE_IS_MOBILE
-ffmpeg::events::Recorder ffmpeg;
+#ifdef WB_FFMPEG_EMBEDDED
+wbffmpeg::Encoder ffmpeg;
 #endif
   std::vector<uint8_t> currentFrame;
   std::mutex lock;

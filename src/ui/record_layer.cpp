@@ -1,4 +1,5 @@
 #include "record_layer.hpp"
+#include <Geode/ui/GeodeUI.hpp>
 #include "../blur.hpp"
 #include "../hacks/coin_finder.hpp"
 #include "../hacks/show_trajectory.hpp"
@@ -6,6 +7,7 @@
 #include "auto_swift_click_settings_layer.hpp"
 #include "autoclicker_settings_layer.hpp"
 #include "clickbot_layer.hpp"
+#include "fake_taps_settings_layer.hpp"
 #include "game_ui.hpp"
 #include "macro_editor.hpp"
 #include "macro_index_popup.hpp"
@@ -61,7 +63,8 @@ const std::vector<std::vector<RecordSetting>> settings{
          menu_selector(ClickbotLayer::open)},
         {"Enable Autoclicker:", "autoclicker_enabled", InputType::Settings,
          0.3f, menu_selector(AutoclickerLayer::open)},
-        {"Faketaps:", "faketaps", InputType::None},
+        {"Faketaps:", "faketaps", InputType::Settings, 0.325f,
+         menu_selector(FakeTapsSettingsLayer::open)},
         {"Ignore inputs:", "macro_ignore_inputs", InputType::None},
         {"Input Mirror:", "p2_input_mirror", InputType::Settings, 0.325f,
          menu_selector(MirrorSettingsLayer::open)},
@@ -900,45 +903,9 @@ void RecordLayer::showKeybindsWarning() {
 void RecordLayer::openKeybinds(CCObject *) {
 #ifdef GEODE_IS_WINDOWS
 
-  MoreOptionsLayer::create()
-      ->onKeybindings(nullptr);
-
-  CCScene *scene =
-      CCDirector::get()->getRunningScene();
-
-  FLAlertLayer *layer =
-      typeinfo_cast<FLAlertLayer *>(
-          scene->getChildren()->lastObject());
-
-  if (!layer)
-    return showKeybindsWarning();
-
-  CCLayer *mainLayer =
-      layer->getChildByType<CCLayer>(0);
-
-  if (!mainLayer)
-    return showKeybindsWarning();
-
-  CCNode *scrollLayer =
-      mainLayer->getChildByID("ScrollLayer");
-
-  if (!scrollLayer)
-    return showKeybindsWarning();
-
-  CCNode *contentLayer =
-      scrollLayer->getChildByID("content-layer");
-
-  if (!contentLayer)
-    return showKeybindsWarning();
-
-  CCNode *DllBot =
-      contentLayer->getChildByID("Dll Bot");
-
-  if (!DllBot)
-    return showKeybindsWarning();
-
-  contentLayer->setPositionY(
-      DllBot->getPositionY() - 118);
+  // GD 2.2091 has no usable MoreOptionsLayer::create / onKeybindings binding on
+  // Windows, and Geode v6 keybinds are edited from the mod's settings popup.
+  geode::openSettingsPopup(Mod::get());
 
 #else
 
@@ -952,11 +919,11 @@ void RecordLayer::openPresets(CCObject *) {
 }
 
 void RecordLayer::onAutosaves(CCObject *) {
-  std::filesystem::path path =
-      Mod::get()->getSettingValue<std::filesystem::path>(
+  asp::fs::Path path =
+      Mod::get()->getSettingValue<asp::fs::Path>(
           "autosaves_folder");
 
-  if (std::filesystem::exists(path))
+  if (asp::fs::exists(path))
     LoadMacroLayer::open(
         static_cast<geode::Popup *>(this),
         nullptr,
