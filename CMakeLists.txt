@@ -297,13 +297,13 @@ if (ANDROID OR WB_IS_IOS OR WB_IS_MACOS OR WIN32)
             -Wl,--exclude-libs,ALL
         )
 
-        if (ANDROID_ABI STREQUAL "armeabi-v7a")
-            # 64-bit file offsets on 32-bit ARM (needs ANDROID_PLATFORM >= 24).
-            target_compile_definitions(${PROJECT_NAME} PRIVATE
-                __USE_FILE_OFFSET64
-            )
-        else()
-            # Android 16 KB page-size compatibility.
+        # Do NOT define __USE_FILE_OFFSET64 / _FILE_OFFSET_BITS=64 for armeabi-v7a here: Geode
+        # builds Android with ANDROID_PLATFORM 23, and on 32-bit bionic below API 24 that define
+        # hides fseeko/ftello, which breaks libc++'s <fstream> (precompiled header fails).
+        # The ffmpeg static libs carry their own file-offset settings; White Bot code does not
+        # use off_t with them.
+        if (NOT ANDROID_ABI STREQUAL "armeabi-v7a")
+            # Android 16 KB page-size compatibility (64-bit only).
             target_link_options(${PROJECT_NAME} PRIVATE
                 -Wl,-z,max-page-size=16384
             )
