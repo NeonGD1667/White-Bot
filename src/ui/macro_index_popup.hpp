@@ -30,7 +30,7 @@
 #include <cctype>
 #include <filesystem>
 #include <fstream>
-#include <nlohmann/json.hpp>
+#include "../replay/json.hpp" // vendored nlohmann 3.11.3 (no CMake include path needed)
 #include <string>
 #include <vector>
 
