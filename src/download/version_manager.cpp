@@ -11,6 +11,8 @@
 #include <Geode/ui/ScrollLayer.hpp>
 #include <Geode/utils/web.hpp>
 
+#include "../utils/fs_compat.hpp"
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
@@ -64,18 +66,18 @@ enum class CheckMode {
 enum class Compat { Note, Warning, Danger };
 
 // ---------------------------------------------------------------- paths
-std::filesystem::path getModPath() {
+asp::fs::Path getModPath() {
     return Mod::get()->getPackagePath();
 }
 
-std::filesystem::path suffixed(char const* suffix) {
+asp::fs::Path suffixed(char const* suffix) {
     auto path = getModPath();
     path += suffix;
     return path;
 }
 
 bool isPackageInstall() {
-    return getModPath().extension() == ".geode";
+    return wbfs::extension(getModPath()) == ".geode";
 }
 
 std::string modID() {
@@ -211,14 +213,13 @@ struct PackageCheck {
 };
 
 // Kiểm tra file tải về đúng là .geode của chính mod này trước khi cho phép cài.
-Result<PackageCheck> validatePackage(std::filesystem::path const& path) {
-    std::error_code ec;
-    auto size = std::filesystem::file_size(path, ec);
-    if (ec || size < 1024)
+Result<PackageCheck> validatePackage(asp::fs::Path const& path) {
+    auto size = wbfs::fileSize(path);
+    if (!size || *size < 1024)
         return Err("The downloaded file is empty or too small.");
 
     {
-        std::ifstream file(path, std::ios::binary);
+        std::ifstream file(wbfs::toStd(path), std::ios::binary);
         char magic[4] = {};
         file.read(magic, 4);
 
@@ -289,34 +290,29 @@ Result<> installPendingUpdate() {
     auto tmpPath = suffixed(".tmp");
     auto bakPath = suffixed(".bak");
 
-    std::error_code ec;
-
-    if (!std::filesystem::exists(tmpPath, ec))
+    if (!asp::fs::exists(tmpPath))
         return Err("No downloaded update was found.");
 
-    std::filesystem::remove(bakPath, ec);
-    ec.clear();
+    wbfs::remove(bakPath);
 
-    bool hadOld = std::filesystem::exists(modPath, ec);
-    ec.clear();
+    bool hadOld = asp::fs::exists(modPath);
 
     if (hadOld) {
-        std::filesystem::rename(modPath, bakPath, ec);
-        if (ec) {
+        auto moved = asp::fs::rename(modPath, bakPath);
+        if (moved.isErr()) {
             return Err(fmt::format(
                 "Could not move the old version out of the way: {}",
-                ec.message()
+                moved.unwrapErr().message()
             ));
         }
     }
 
-    std::filesystem::rename(tmpPath, modPath, ec);
-    if (ec) {
-        auto message = ec.message();
+    auto installed = asp::fs::rename(tmpPath, modPath);
+    if (installed.isErr()) {
+        std::string message(installed.unwrapErr().message());
 
-        std::error_code restoreEc;
         if (hadOld)
-            std::filesystem::rename(bakPath, modPath, restoreEc);
+            wbfs::rename(bakPath, modPath);
 
         return Err(fmt::format(
             "Could not install the new version: {}",
@@ -324,7 +320,7 @@ Result<> installPendingUpdate() {
         ));
     }
 
-    std::filesystem::remove(bakPath, ec);
+    wbfs::remove(bakPath);
 
     log::info("Installed downloaded update: {}", modPath.string());
     return Ok();
@@ -332,9 +328,8 @@ Result<> installPendingUpdate() {
 
 // Xoá file rác còn sót từ lần cài/tải dang dở.
 void cleanupLeftovers() {
-    std::error_code ec;
-    std::filesystem::remove(suffixed(".bak"), ec);
-    std::filesystem::remove(suffixed(".tmp.part"), ec);
+    wbfs::remove(suffixed(".bak"));
+    wbfs::remove(suffixed(".tmp.part"));
 }
 
 // Người dùng bấm "Later" ở lần trước: cài .tmp còn sót ngay khi mod load.
@@ -343,20 +338,18 @@ void applyLeftoverUpdate() {
         return;
 
     auto tmpPath = suffixed(".tmp");
-    std::error_code ec;
-
-    if (!std::filesystem::exists(tmpPath, ec))
+    if (!asp::fs::exists(tmpPath))
         return;
 
     auto check = validatePackage(tmpPath);
     if (!check) {
         log::warn("Discarding invalid pending update: {}", check.unwrapErr());
-        std::filesystem::remove(tmpPath, ec);
+        wbfs::remove(tmpPath);
         return;
     }
 
     if (check.unwrap().version == Mod::get()->getVersion().toVString()) {
-        std::filesystem::remove(tmpPath, ec);  // đã là bản đang chạy
+        wbfs::remove(tmpPath);  // đã là bản đang chạy
         return;
     }
 
@@ -416,7 +409,7 @@ void UpdaterClient::fetchReleases(
     req.userAgent("White-Bot-Updater");
     req.header("Accept", "application/vnd.github+json");
     req.param("per_page", 50);
-    req.timeout(std::chrono::seconds(20));
+    req.timeout(asp::Duration::fromSecs(20));
 
     auto url = fmt::format(
         "https://api.github.com/repos/{}/releases",
@@ -479,7 +472,7 @@ void UpdaterClient::downloadRelease(
     geode::utils::web::WebRequest req;
     req.userAgent("White-Bot-Updater");
     req.followRedirects(true);
-    req.timeout(std::chrono::seconds(180));
+    req.timeout(asp::Duration::fromSecs(180));
 
     s_downloadHolder.spawn(
         req.get(release.downloadUrl),
@@ -491,8 +484,6 @@ void UpdaterClient::downloadRelease(
             DownloadResult out;
             out.code = res.code();
 
-            std::error_code ec;
-
             if (!res.ok()) {
                 out.error = describeHttp(res.code());
                 callback(out);
@@ -503,7 +494,7 @@ void UpdaterClient::downloadRelease(
             auto written = res.into(partPath);
             if (!written) {
                 out.error = "Failed to save the download: " + written.unwrapErr();
-                std::filesystem::remove(partPath, ec);
+                wbfs::remove(partPath);
                 callback(out);
                 return;
             }
@@ -511,18 +502,17 @@ void UpdaterClient::downloadRelease(
             auto check = validatePackage(partPath);
             if (!check) {
                 out.error = check.unwrapErr();
-                std::filesystem::remove(partPath, ec);
+                wbfs::remove(partPath);
                 callback(out);
                 return;
             }
 
-            std::filesystem::remove(tmpPath, ec);
-            ec.clear();
+            wbfs::remove(tmpPath);
 
-            std::filesystem::rename(partPath, tmpPath, ec);
-            if (ec) {
-                out.error = "Failed to finalize the download: " + ec.message();
-                std::filesystem::remove(partPath, ec);
+            auto finalized = asp::fs::rename(partPath, tmpPath);
+            if (finalized.isErr()) {
+                out.error = "Failed to finalize the download: " + std::string(finalized.unwrapErr().message());
+                wbfs::remove(partPath);
                 callback(out);
                 return;
             }

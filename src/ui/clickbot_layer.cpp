@@ -8,9 +8,9 @@ void ClickbotLayer::updateLabels() {
 
 		ClickSetting settings = matjson::Serialize<ClickSetting>::from_json(data);
 
-		std::string filename = settings.path.filename().string();
+		std::string filename = wbfs::filename(settings.path);
 
-		if (!std::filesystem::exists(settings.path)) filename = "N/A";
+		if (!asp::fs::exists(settings.path)) filename = "N/A";
 
 		labels[i]->setString(filename.c_str());
 		labels[i]->limitLabelWidth(72.f, 1.f, 0.01f);
@@ -312,9 +312,9 @@ bool ClickSettingsLayer::setup() {
 
 	matjson::Value data = Mod::get()->getSavedValue<matjson::Value>(button);
 	settings = matjson::Serialize<ClickSetting>::from_json(data);
-	std::string filename = settings.path.filename().string();
+	std::string filename = wbfs::filename(settings.path);
 
-	if (!std::filesystem::exists(settings.path)) filename = "N/A";
+	if (!asp::fs::exists(settings.path)) filename = "N/A";
 
 	CCScale9Sprite* bg = CCScale9Sprite::create("square02b_001.png", { 0, 0, 80, 80 });
 	bg->setColor({ 0,0,0 });
@@ -404,9 +404,9 @@ void ClickSettingsLayer::onSelectFile(CCObject*) {
 
 	geode::async::spawn(file::pick(file::PickMode::OpenFile, { Mod::get()->getResourcesDir(), { textFilter } }), [this](file::PickResult res) {
 		if (res.isOk() && res.unwrap().has_value()) {
-			std::filesystem::path path = res.unwrap().value();
+			asp::fs::Path path = res.unwrap().value();
 
-			filenameLabel->setString(path.filename().string().c_str());
+			filenameLabel->setString(wbfs::filename(path).c_str());
 
 			settings.path = path;
 			saveSettings();
@@ -427,9 +427,9 @@ void ClickSettingsLayer::onRestore(CCObject*) {
 
 	settings.disabled = false;
 	
-	std::filesystem::path path = Mod::get()->getResourcesDir() / fmt::format("default_{}.mp3", button);
+	asp::fs::Path path = Mod::get()->getResourcesDir() / fmt::format("default_{}.mp3", button);
 
-	filenameLabel->setString(path.filename().string().c_str());
+	filenameLabel->setString(wbfs::filename(path).c_str());
 
 	settings.path = path;
 	saveSettings();

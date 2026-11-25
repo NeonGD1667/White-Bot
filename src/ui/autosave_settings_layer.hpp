@@ -1,6 +1,6 @@
 #include "../includes.hpp"
 
-class AutoSaveLayer : public geode::Popup, public TextInputDelegate {
+class AutoSaveLayer : public geode::Popup {
 
 private:
 
@@ -13,7 +13,10 @@ private:
 
 	STATIC_CREATE(AutoSaveLayer, 250, 190)
 
-	void textChanged(CCTextInputNode*) override {
+	// Geode v6: TextInput no longer wraps a CCTextInputNode, so the old
+	// TextInputDelegate::textChanged override is replaced by a per-input
+	// setCallback lambda (registered in setup()).
+	void textChanged() {
 		std::string str = intervalInput->getString();
 		float mins = geode::utils::numFromString<float>(str).unwrapOr(0.f);
 
@@ -60,9 +63,9 @@ private:
 		intervalInput->setPosition({169, 130});
 		intervalInput->setScale(0.675f);
 		intervalInput->setString(Mod::get()->getSavedValue<std::string>("autosave_interval").c_str());
-		intervalInput->getInputNode()->setDelegate(this);
-		intervalInput->getInputNode()->setAllowedChars("0123456789.");
-		intervalInput->getInputNode()->setMaxLabelLength(4);
+		intervalInput->setCallback([this](std::string const&) { textChanged(); });
+		intervalInput->setFilter("0123456789.");
+		intervalInput->setMaxCharCount(4);
 		m_mainLayer->addChild(intervalInput);
 
 		intervalToggle = CCMenuItemToggler::create(
@@ -104,7 +107,7 @@ private:
 		btn->setPosition({m_size.width / 2, 24});
 		m_buttonMenu->addChild(btn);
 
-		textChanged(nullptr);
+		textChanged();
 		updateInputs();
 
 		return true;
@@ -128,11 +131,10 @@ private:
 		intervalLbl2->setOpacity(g.autosaveIntervalEnabled ? 255 : 100);
 		intervalInput->getBGSprite()->setOpacity(g.autosaveIntervalEnabled ? 90 : 30);
 		intervalInput->setEnabled(g.autosaveIntervalEnabled);
-		// intervalInput->getInputNode()->m_placeholderLabel->setOpacity(g.autosaveIntervalEnabled ? 255 : 100);
+		// v6 TextInput owns its placeholder and caret internally; unfocus()
+		// detaches the IME and hides the caret.
 		if (!g.autosaveIntervalEnabled) {
-			intervalInput->getInputNode()->detachWithIME();
-			intervalInput->getInputNode()->onClickTrackNode(false);
-			intervalInput->getInputNode()->m_cursor->setVisible(false);
+			intervalInput->unfocus();
 		}
 
 	}

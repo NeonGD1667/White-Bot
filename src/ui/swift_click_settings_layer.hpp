@@ -3,7 +3,7 @@
 #include "../includes.hpp"
 #include "../utils/utils.hpp"
 
-class SwiftClickSettingsLayer : public geode::Popup, public TextInputDelegate {
+class SwiftClickSettingsLayer : public geode::Popup {
 
 private:
   TextInput *countInput = nullptr;
@@ -11,7 +11,8 @@ private:
 
   STATIC_CREATE(SwiftClickSettingsLayer, 200, 150)
 
-  void textChanged(CCTextInputNode *) override {
+  // Geode v6: TextInput callbacks replace the removed TextInputDelegate.
+  void textChanged() {
     auto &g = Global::get();
     g.swiftClickCount =
         geode::utils::numFromString<int>(countInput->getString()).unwrapOr(2);
@@ -43,9 +44,9 @@ private:
     countInput->setString(std::to_string(Mod::get()->getSavedValue<int64_t>(
                                              "swift_click_count", 2))
                               .c_str());
-    countInput->getInputNode()->setDelegate(this);
-    countInput->getInputNode()->setAllowedChars("0123456789");
-    countInput->getInputNode()->setMaxLabelLength(2);
+    countInput->setCallback([this](std::string const &) { textChanged(); });
+    countInput->setFilter("0123456789");
+    countInput->setMaxCharCount(2);
     m_mainLayer->addChild(countInput);
 
     // Key Code
@@ -59,9 +60,9 @@ private:
     keyInput->setString(std::to_string(Mod::get()->getSavedValue<int64_t>(
                                            "swift_click_key", 72))
                             .c_str());
-    keyInput->getInputNode()->setDelegate(this);
-    keyInput->getInputNode()->setAllowedChars("0123456789");
-    keyInput->getInputNode()->setMaxLabelLength(3);
+    keyInput->setCallback([this](std::string const &) { textChanged(); });
+    keyInput->setFilter("0123456789");
+    keyInput->setMaxCharCount(3);
     m_mainLayer->addChild(keyInput);
 
     CCLabelBMFont *hint =

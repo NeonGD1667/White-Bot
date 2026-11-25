@@ -103,7 +103,7 @@ struct Macro : wbleg::Replay<Macro, input> {
     //   everything else    -> detected from the content: GDR1 (MessagePack / JSON), GDR2, WBR
     // This is the single loading path used by the macro list, the import button and merge.
     static LoadResult readFile(
-        std::filesystem::path const& path,
+        asp::fs::Path const& path,
         Macro& out
     );
 
@@ -114,7 +114,7 @@ struct Macro : wbleg::Replay<Macro, input> {
         // file could not be written, 51 the macro could not be converted.
         int errorId = 0;
         std::string message;
-        std::filesystem::path createdPath;
+        asp::fs::Path createdPath;
         bool fromXd = false; // the UI shows the ".xd may not work" warning
     };
 
@@ -123,8 +123,8 @@ struct Macro : wbleg::Replay<Macro, input> {
     //   GDR1 (MessagePack / JSON) and XD are stored as readable .gdr.json, as before.
     // An existing file is never overwritten: "name (1).ext", "name (2).ext"...
     static ImportResult importToFolder(
-        std::filesystem::path const& source,
-        std::filesystem::path const& folder
+        asp::fs::Path const& source,
+        asp::fs::Path const& folder
     );
 
     // json == true -> GDR1 JSON text, false -> GDR1 MessagePack. Returns an empty vector on failure.
@@ -148,11 +148,11 @@ struct Macro : wbleg::Replay<Macro, input> {
     );
 
     static bool loadXDFile(
-        std::filesystem::path path
+        asp::fs::Path path
     );
 
     static Macro XDtoGDR(
-        std::filesystem::path path
+        asp::fs::Path path
     );
 
     // GDR2
@@ -189,7 +189,7 @@ struct Macro : wbleg::Replay<Macro, input> {
     );
 
     static bool loadSLC2(
-        std::filesystem::path path
+        asp::fs::Path path
     );
 
     // SLC3
@@ -200,7 +200,7 @@ struct Macro : wbleg::Replay<Macro, input> {
     );
 
     static bool loadSLC3(
-        std::filesystem::path path
+        asp::fs::Path path
     );
 
     static void autoSave(
@@ -432,10 +432,9 @@ struct PlayerData {
     int m_followRelated;
     float m_unk838;
     int m_stateOnGround;
-    unsigned char m_stateUnk;
-    unsigned char m_stateNoStickX;
-    unsigned char m_stateNoStickY;
-    unsigned char m_stateUnk2;
+    // 2.2091: m_stateUnk became the (unused) float m_unusedFloatA80; the old
+    // m_stateNoStickX / m_stateNoStickY / m_stateUnk2 bytes no longer exist.
+    float m_stateUnk;
     int m_stateBoostX;
     int m_stateBoostY;
     int m_maybeStateForce2;

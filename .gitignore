@@ -1,0 +1,26 @@
+# Build output
+build/
+build-*/
+cmake-build-*/
+out/
+
+# CMake / compiler artefacts
+CMakeCache.txt
+CMakeFiles/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.geode
+
+# IDE / OS
+.vscode/.browse*
+.DS_Store
+Thumbs.db
+
+# Local logs
+logs/
+*.log

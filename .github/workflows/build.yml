@@ -6,8 +6,26 @@ on:
     branches:
       - "**"
 
+env:
+  # Immutable dependency pins (see DEPENDENCIES.md / CI_DEPENDENCY_LOCK.md).
+  GEODE_SDK_VERSION: "6.0.0"
+  GEODE_BINDINGS_REF: "c46bcdfc511b992200bb3818f7c1de1f41dc8fde"
+  # geode-sdk/build-geode-mod @ main (2026-11 audit), pinned by full commit SHA.
+  BUILD_GEODE_MOD_REF: "dce36b35e1c3d9d8af92347760b12eba3caf4004"
+
 jobs:
+  verify-pins:
+    name: Verify dependency pins
+    runs-on: ubuntu-latest
+    steps:
+      # actions/checkout v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify immutable revisions and FFmpeg hashes
+        run: bash ci/verify-pins.sh
+
   build:
+    name: ${{ matrix.config.name }}
+    needs: ['verify-pins']
     strategy:
       fail-fast: false
       matrix:
@@ -26,28 +44,43 @@ jobs:
             os: macos-latest
             target: iOS
 
-    name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
 
     steps:
-      - uses: actions/checkout@v4
+      # actions/checkout v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Build the mod
-        uses: geode-sdk/build-geode-mod@main
+        # geode-sdk/build-geode-mod @ main, pinned to a full commit SHA.
+        uses: geode-sdk/build-geode-mod@dce36b35e1c3d9d8af92347760b12eba3caf4004
         with:
-          sdk: '5.11.2'
+          sdk: ${{ env.GEODE_SDK_VERSION }}
+          bindings: geode-sdk/bindings
+          bindings-ref: ${{ env.GEODE_BINDINGS_REF }}
           combine: true
           target: ${{ matrix.config.target }}
+
+      - name: Verify the SDK / bindings actually used
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          if [ ! -d "$GEODE_SDK/.git" ] || [ ! -d "$GEODE_BINDINGS_REPO_PATH/.git" ]; then
+            echo "::error::Expected git checkouts for GEODE_SDK and bindings"
+            exit 1
+          fi
+          bash ci/verify-pins.sh
 
   package:
     name: Package builds
     runs-on: ubuntu-latest
     needs: ['build']
     steps:
-      - uses: geode-sdk/build-geode-mod/combine@main
+      # geode-sdk/build-geode-mod/combine @ same pinned commit.
+      - uses: geode-sdk/build-geode-mod/combine@dce36b35e1c3d9d8af92347760b12eba3caf4004
         id: build
 
-      - uses: actions/upload-artifact@v4
+      # actions/upload-artifact v4.6.2
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Build Output
           path: ${{ steps.build.outputs.build-output }}

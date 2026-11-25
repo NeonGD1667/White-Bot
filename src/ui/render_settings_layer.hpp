@@ -3,7 +3,7 @@
 #include "../includes.hpp"
 #include "../utils/utils.hpp"
 
-class RenderSettingsLayer : public geode::Popup, public TextInputDelegate {
+class RenderSettingsLayer : public geode::Popup {
 
 public:
   Slider *sfxSlider = nullptr;
@@ -33,7 +33,12 @@ public:
 
   void close(CCObject *) { keyBackClicked(); }
 
+  // Vanilla CCTextInputNode delegate (args / audio args / video args /
+  // seconds) is still part of Geometry Dash 2.2091.
   void textChanged(CCTextInputNode *node) override;
+
+  // Persists every field; used by the geode::TextInput callbacks (v6).
+  void saveRenderInputs();
 
   void onSlider(CCObject *);
 

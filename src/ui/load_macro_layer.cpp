@@ -34,19 +34,19 @@ class $modify(CCMenu) {
 
 void LoadMacroLayer::open(geode::Popup *layer, geode::Popup *layer2,
                           bool autosaves) {
-  std::filesystem::path path =
-      Mod::get()->getSettingValue<std::filesystem::path>("macros_folder");
+  asp::fs::Path path =
+      Mod::get()->getSettingValue<asp::fs::Path>("macros_folder");
 
-  if (!std::filesystem::exists(path)) {
+  if (!asp::fs::exists(path)) {
     if (utils::file::createDirectoryAll(path).isErr())
       return FLAlertLayer::create(
                  "Error", "There was an error getting the folder. ID: 6", "Ok")
           ->show();
   }
 
-  path = Mod::get()->getSettingValue<std::filesystem::path>("autosaves_folder");
+  path = Mod::get()->getSettingValue<asp::fs::Path>("autosaves_folder");
 
-  if (!std::filesystem::exists(path)) {
+  if (!asp::fs::exists(path)) {
     if (utils::file::createDirectoryAll(path).isErr())
       return FLAlertLayer::create(
                  "Error", "There was an error getting the folder. ID: 61", "Ok")
@@ -58,8 +58,8 @@ void LoadMacroLayer::open(geode::Popup *layer, geode::Popup *layer2,
   layerReal->show();
 }
 
-void LoadMacroLayer::textChanged(CCTextInputNode *node) {
-  search = Utils::toLower(node->getString());
+void LoadMacroLayer::onSearchInput(std::string const& text) {
+  search = Utils::toLower(text);
   if (search != "") {
     searchOff->setVisible(true);
     searchOff->setOpacity(184);
@@ -164,7 +164,7 @@ void LoadMacroLayer::onImportMacroFinished(file::PickResult res) {
   // Validation, format detection, conversion and unique naming all live in Macro::importToFolder().
   auto imported = Macro::importToFolder(
       res.unwrap().value(),
-      Mod::get()->getSettingValue<std::filesystem::path>("macros_folder"));
+      Mod::get()->getSettingValue<asp::fs::Path>("macros_folder"));
 
   if (!imported.ok) {
     std::string text = "There was an error importing this macro. ID: " +
@@ -221,7 +221,7 @@ bool LoadMacroLayer::setup() {
 
   setTitle(isMerge ? "Merge Macro" : "Load Macro");
   m_title->setPositionY(m_title->getPositionY() + 5);
-  m_closeBtn->getNormalImage()->setScale(0.6f);
+  m_closeBtn->getDisplayNode()->setScale(0.6f);
 
   cocos2d::CCPoint offset = (CCDirector::sharedDirector()->getWinSize() -
                              m_mainLayer->getContentSize()) /
@@ -242,7 +242,8 @@ bool LoadMacroLayer::setup() {
 
     searchInput = TextInput::create(235, "Search Macro", "bigFont.fnt");
     searchInput->setPositionY(100);
-    searchInput->setDelegate(this);
+    searchInput->setCallback(
+        [this](std::string const& text) { onSearchInput(text); });
     menu->addChild(searchInput);
 
     CCSprite *emptyBtn =
@@ -395,10 +396,10 @@ void LoadMacroLayer::updateSort(CCObject *) {
 void LoadMacroLayer::addList(bool refresh, float prevScroll) {
   cocos2d::CCSize winSize = cocos2d::CCDirector::sharedDirector()->getWinSize();
 
-  std::filesystem::path path =
-      Mod::get()->getSettingValue<std::filesystem::path>(
+  asp::fs::Path path =
+      Mod::get()->getSettingValue<asp::fs::Path>(
           isAutosaves ? "autosaves_folder" : "macros_folder");
-  std::vector<std::filesystem::path> macros =
+  std::vector<asp::fs::Path> macros =
       file::readDirectory(path).unwrapOrDefault();
 
   CCArray *cells = CCArray::create();
@@ -409,16 +410,16 @@ void LoadMacroLayer::addList(bool refresh, float prevScroll) {
 
   for (int i = start; i != end; i += step) {
 
-   if (macros[i].extension() != ".gdr" && macros[i].extension() != ".gdr2" &&
-    macros[i].extension() != ".wbr" && macros[i].extension() != ".xd" &&
-    macros[i].extension() != ".json" && macros[i].extension() != ".slc2" &&
-    macros[i].extension() != ".slc3")
-  continue;
+    std::string ext = wbfs::extension(macros[i]);
 
-    std::string name = macros[i].filename().string().substr(
-        0, macros[i].filename().string().find_last_of('.'));
+    if (ext != ".gdr" && ext != ".gdr2" && ext != ".wbr" && ext != ".xd" &&
+        ext != ".json" && ext != ".slc2" && ext != ".slc3")
+      continue;
 
-    if (macros[i].extension() == ".json")
+    std::string fileName = wbfs::filename(macros[i]);
+    std::string name = fileName.substr(0, fileName.find_last_of('.'));
+
+    if (ext == ".json")
       name = name.substr(0, name.find_last_of('.'));
 
     if (Utils::toLower(name).find(search) == std::string::npos && search != "")

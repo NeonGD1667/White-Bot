@@ -12,7 +12,7 @@ $execute {
     }
 
     if (!g.mod->setSavedValue("clickbot_defaults4", true)) {
-        std::filesystem::path dir = g.mod->getResourcesDir();
+        asp::fs::Path dir = g.mod->getResourcesDir();
         ClickSetting setts;
 
         for (const auto& str : buttonNames) {
@@ -142,7 +142,7 @@ void Clickbot::updateSounds() {
     for (std::string name : buttonNames) {
         matjson::Value data = Global::get().mod->getSavedValue<matjson::Value>(name);
         ClickSetting settings = matjson::Serialize<ClickSetting>::from_json(data);
-        if (!std::filesystem::exists(settings.path)) continue;
+        if (!asp::fs::exists(settings.path)) continue;
 
         FMOD::Sound* sound = getSound(name);
         result = c.system->createSound(settings.path.string().c_str(), FMOD_DEFAULT, nullptr, &sound);

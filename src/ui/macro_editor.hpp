@@ -12,7 +12,7 @@ struct InputText {
     std::string action;
 };
 
-class MacroEditLayer : public geode::Popup, public TextInputDelegate {
+class MacroEditLayer : public geode::Popup {
 
 private:
     
@@ -24,7 +24,11 @@ private:
         onClose(nullptr);
     }
 
-    void textChanged(CCTextInputNode* input) override;
+    // Geode v6: TextInput no longer wraps a CCTextInputNode and has no
+    // delegate; each input gets its own callback so the edited field is
+    // unambiguous.
+    void onPageInput(std::string const& text);
+    void onFrameInput(std::string const& text);
 
     ~MacroEditLayer() override;
     

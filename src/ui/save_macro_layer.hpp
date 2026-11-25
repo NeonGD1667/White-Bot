@@ -294,12 +294,12 @@ public:
             )->show();
         }
 
-        std::filesystem::path path =
+        asp::fs::Path path =
             Mod::get()->getSettingValue<
-                std::filesystem::path
+                asp::fs::Path
             >("macros_folder");
 
-        if (!std::filesystem::exists(path)) {
+        if (!asp::fs::exists(path)) {
             if (!utils::file::createDirectoryAll(path).isOk()) {
                 return FLAlertLayer::create(
                     "Error",
@@ -361,9 +361,9 @@ public:
             )->show();
         }
 
-        std::filesystem::path path =
+        asp::fs::Path path =
             Mod::get()->getSettingValue<
-                std::filesystem::path
+                asp::fs::Path
             >("macros_folder") /
             macroName;
 

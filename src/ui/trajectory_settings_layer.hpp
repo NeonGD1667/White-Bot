@@ -1,7 +1,7 @@
 #include "../hacks/show_trajectory.hpp"
 #include "../includes.hpp"
 
-class TrajectorySettingsLayer : public geode::Popup, public TextInputDelegate {
+class TrajectorySettingsLayer : public geode::Popup {
 
 public:
   STATIC_CREATE(TrajectorySettingsLayer, 250, 180)
@@ -56,8 +56,8 @@ private:
     input = TextInput::create(50.f, "0");
     input->setPosition({68, 56});
     input->setScale(0.65f);
-    input->getInputNode()->setAllowedChars("0123456789");
-    input->getInputNode()->setDelegate(this);
+    input->setFilter("0123456789");
+    input->setCallback([this](std::string const &) { textChanged(); });
     input->setString(
         Mod::get()->getSavedValue<std::string>("trajectory_length").c_str());
     m_mainLayer->addChild(input);
@@ -114,7 +114,7 @@ private:
     input->setString("240");
 
     updateColor();
-    textChanged(nullptr);
+    textChanged();
   }
 
   void openColorPicker(CCObject *obj) {
@@ -148,7 +148,8 @@ private:
     );
 }
 
-void textChanged(CCTextInputNode*) override {
+// Geode v6: TextInput callbacks replace the removed TextInputDelegate.
+void textChanged() {
     std::string str = input->getString();
     int length = geode::utils::numFromString<int>(str).unwrapOr(0);
 

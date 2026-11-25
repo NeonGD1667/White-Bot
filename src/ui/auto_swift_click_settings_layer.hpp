@@ -2,15 +2,15 @@
 
 #include "../includes.hpp"
 
-class AutoSwiftClickSettingsLayer : public geode::Popup,
-                                    public TextInputDelegate {
+class AutoSwiftClickSettingsLayer : public geode::Popup {
 
 private:
   TextInput *countInput = nullptr;
 
   STATIC_CREATE(AutoSwiftClickSettingsLayer, 200, 120)
 
-  void textChanged(CCTextInputNode *) override {
+  // Geode v6: TextInput callbacks replace the removed TextInputDelegate.
+  void textChanged() {
     auto &g = Global::get();
     g.autoSwiftClickCount =
         geode::utils::numFromString<int>(countInput->getString()).unwrapOr(2);
@@ -39,9 +39,9 @@ private:
     countInput->setString(std::to_string(Mod::get()->getSavedValue<int64_t>(
                                              "auto_swift_click_count", 2))
                               .c_str());
-    countInput->getInputNode()->setDelegate(this);
-    countInput->getInputNode()->setAllowedChars("0123456789");
-    countInput->getInputNode()->setMaxLabelLength(2);
+    countInput->setCallback([this](std::string const &) { textChanged(); });
+    countInput->setFilter("0123456789");
+    countInput->setMaxCharCount(2);
     m_mainLayer->addChild(countInput);
 
     CCLabelBMFont *hint =

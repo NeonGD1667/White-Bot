@@ -1,5 +1,6 @@
 #include "../includes.hpp"
 #include "../pathfinder.hpp"
+#include "noclip_tint.hpp"
 #include "../ui/record_layer.hpp"
 
 #include <Geode/modify/CCScheduler.hpp>
@@ -146,8 +147,10 @@ class $modify(PlayLayer) {
                m_fields->slopeFix == p1) {
       PlayLayer::destroyPlayer(p0, p1);
       died = true;
-    } else
+    } else {
       Global::get().safeMode = true;
+      NoclipTint::trigger(this);
+    }
 
     if (died && PathFinder::isRunning())
       PathFinder::onDeath(Global::getCurrentFrame());
@@ -290,7 +293,7 @@ class $modify(GJGameLevel) {
 
 class $modify(EffectGameObject) {
 
-  void triggerObject(GJBaseGameLayer *p0, int p1, gd::vector<int> const *p2) {
+  void triggerObject(GJBaseGameLayer *p0, int p1, std::vector<int> const *p2) {
     if (!Global::get().disableShaders)
       return EffectGameObject::triggerObject(p0, p1, p2);
 

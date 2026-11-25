@@ -52,8 +52,8 @@ class $modify(PlayLayer) {
           ("Frame: " + std::to_string(Global::getCurrentFrame())).c_str());
   }
 
-  bool init(GJGameLevel *level, bool b1, bool b2) {
-    if (!PlayLayer::init(level, b1, b2))
+  bool init(GJGameLevel *level, bool b1) {
+    if (!PlayLayer::init(level, b1))
       return false;
 
     Interface::addLabels(this);
