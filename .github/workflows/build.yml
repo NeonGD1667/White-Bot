@@ -1,4 +1,4 @@
-```yaml
+
 name: Build Geode Mod
 
 on:
@@ -71,4 +71,4 @@ jobs:
           name: White-Bot-Geode-v6-2.2091
           path: ${{ steps.build.outputs.build-output }}
           if-no-files-found: error
-```
+
