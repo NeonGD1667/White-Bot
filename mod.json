@@ -1,26 +1,16 @@
 {
-    "geode": "5.11.2",
+    "geode": "6.0.0",
     "gd": {
-        "win": "2.2081",
-        "android": "2.2081",
-        "mac": "2.2081",
-        "ios": "2.2081"
+        "win": "2.2091",
+        "android": "2.2091",
+        "mac": "2.2091",
+        "ios": "2.2091"
     },
-    "version": "v3.1.0",
+    "version": "v3.2.0",
     "id": "homeless.white-bot",
     "name": "White Bot",
     "developer": "Homeless Team",
     "description": "Ultimate Bot for GD",
-    "dependencies": {
-        "eclipse.ffmpeg-api": {
-            "version": ">=v2.0.0",
-            "required": true,
-            "platforms": [
-                "android",
-                "ios"
-            ]
-        }
-    },
     "settings": {
         "button-setting": {
             "type": "custom:button",
@@ -160,9 +150,18 @@
             "type": "bool",
             "default": false
         },
+        "render_legacy": {
+            "name": "Legacy Render",
+            "description": "Uses the old render, which pipes frames to ffmpeg.exe (set its path below). When off, the embedded ffmpeg is used and ffmpeg.exe is not needed.",
+            "type": "bool",
+            "default": false,
+            "platforms": [
+                "win"
+            ]
+        },
         "ffmpeg_path": {
-            "name": "ffmpeg.exe Path",
-            "description": "The path for ffmpeg.exe, needed to use render.",
+            "name": "Legacy Render: ffmpeg.exe Path",
+            "description": "The path for ffmpeg.exe, only needed for Legacy Render.",
             "type": "file",
             "default": "",
             "platforms": [
