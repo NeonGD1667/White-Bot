@@ -12,8 +12,8 @@ PlayerData PlayerPracticeFixes::saveData(PlayerObject* player) {
     data.m_rotateObjectsRelated.insert(player->m_rotateObjectsRelated.begin(), player->m_rotateObjectsRelated.end());
     // data.m_maybeRotatedObjectsMap.insert(player->m_maybeRotatedObjectsMap.begin(), player->m_maybeRotatedObjectsMap.end());
     data.m_touchedRings.insert(player->m_touchedRings.begin(), player->m_touchedRings.end());
-    data.m_ringRelatedSet.insert(player->m_ringRelatedSet.begin(), player->m_ringRelatedSet.end());
-    data.m_jumpPadRelated.insert(player->m_jumpPadRelated.begin(), player->m_jumpPadRelated.end());
+    data.m_ringRelatedSet.insert(player->m_usedRings.begin(), player->m_usedRings.end());
+    data.m_jumpPadRelated.insert(player->m_touchedForceIds.begin(), player->m_touchedForceIds.end());
     data.m_holdingButtons.insert(player->m_holdingButtons.begin(), player->m_holdingButtons.end());
 
     for (const auto& el : player->m_playerFollowFloats)
@@ -276,8 +276,8 @@ void PlayerPracticeFixes::applyData(PlayerObject* player, PlayerData data, bool 
     player->m_rotateObjectsRelated.insert(data.m_rotateObjectsRelated.begin(), data.m_rotateObjectsRelated.end());
     // player->m_maybeRotatedObjectsMap.insert(data.m_maybeRotatedObjectsMap.begin(), data.m_maybeRotatedObjectsMap.end());
     player->m_touchedRings.insert(data.m_touchedRings.begin(), data.m_touchedRings.end());
-    player->m_ringRelatedSet.insert(data.m_ringRelatedSet.begin(), data.m_ringRelatedSet.end());
-    player->m_jumpPadRelated.insert(data.m_jumpPadRelated.begin(), data.m_jumpPadRelated.end());
+    player->m_usedRings.insert(data.m_ringRelatedSet.begin(), data.m_ringRelatedSet.end());
+    player->m_touchedForceIds.insert(data.m_jumpPadRelated.begin(), data.m_jumpPadRelated.end());
     player->m_holdingButtons.insert(data.m_holdingButtons.begin(), data.m_holdingButtons.end());
 
     player->m_playerFollowFloats.clear();
